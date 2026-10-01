@@ -1,9 +1,0 @@
-node_modules/
-# Scheduler build files
-scheduler/build/
-
-# Scheduler compiled executables
-scheduler/*.exe
-
-# Project documents
-*.txt
