@@ -10,6 +10,7 @@ const factorRoutes = require('./routes/factorRoutes');
 const emissionRoutes = require('./routes/emissionRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const calculatorRoutes = require('./routes/calculatorRoutes');
 
 // Middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -38,6 +39,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/emission-factors', factorRoutes);
 app.use('/api/emissions', emissionRoutes);
+app.use('/api/calculator', calculatorRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
