@@ -1,0 +1,37 @@
+# Dependencies & Environments
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Scheduler C++ build artifacts
+scheduler/build/
+scheduler/*.exe
+scheduler/*.o
+scheduler/*.obj
+scheduler/CMakeCache.txt
+scheduler/CMakeFiles/
+*.exe
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local development tracking (never push to GitHub)
+LOCAL_PROGRESS_README.md
+*.local.md
+
+# Project specification text documents (uncomment if you don't want them in git)
+*.txt
