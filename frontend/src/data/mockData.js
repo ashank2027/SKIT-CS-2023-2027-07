@@ -101,12 +101,12 @@ export const mockReports = [
 
 export const mockAnalyticsData = {
   emissionsByTime: [
-    { period: '2026-04', value: 2200 },
-    { period: '2026-05', value: 2100 },
-    { period: '2026-06', value: 2050 },
-    { period: '2026-07', value: 1980 },
-    { period: '2026-08', value: 1920 },
-    { period: '2026-09', value: 2340 },
+    { period: '2026-04', value: 2200, prevYear: 2450 },
+    { period: '2026-05', value: 2100, prevYear: 2310 },
+    { period: '2026-06', value: 2050, prevYear: 2200 },
+    { period: '2026-07', value: 1980, prevYear: 2150 },
+    { period: '2026-08', value: 1920, prevYear: 2080 },
+    { period: '2026-09', value: 2340, prevYear: 2520 },
   ],
   emissionsByCategory: [
     { name: 'Electricity', value: 5980, fill: '#00bcd4' },
@@ -122,4 +122,35 @@ export const mockAnalyticsData = {
     { name: 'Hamburg', value: 1500 },
     { name: 'Other', value: 850 },
   ],
+  emissionsByIndustry: [
+    { name: 'Technology', value: 3850, percentage: 31 },
+    { name: 'Manufacturing', value: 3420, percentage: 27 },
+    { name: 'Energy', value: 2280, percentage: 18 },
+    { name: 'Transportation', value: 1650, percentage: 13 },
+    { name: 'Healthcare', value: 820, percentage: 7 },
+    { name: 'Finance', value: 430, percentage: 4 },
+  ],
+  emissionsBySector: [
+    { name: 'Scope 1 (Direct)', value: 3940, fill: '#ff7043', description: 'Fuel combustion, company fleet, on-site facilities' },
+    { name: 'Scope 2 (Indirect Energy)', value: 5980, fill: '#00e5a0', description: 'Purchased electricity, steam, heating & cooling' },
+    { name: 'Scope 3 (Value Chain)', value: 2530, fill: '#7c4dff', description: 'Business travel, waste disposal, purchased goods & logistics' },
+  ],
 }
+
+export const mockEmissionFactors = [
+  { id: 1, category_id: 1, category: 'Electricity', activity: 'Grid Electricity', unit: 'kWh', factor: 0.000385, source: 'IEA / European Grid Average 2026' },
+  { id: 2, category_id: 1, category: 'Electricity', activity: 'Renewable Hydro/Solar Grid', unit: 'kWh', factor: 0.000045, source: 'GHG Protocol Scope 2' },
+  { id: 3, category_id: 1, category: 'Electricity', activity: 'High-Voltage Industrial', unit: 'MWh', factor: 0.385000, source: 'IEA Industrial Benchmarks' },
+  { id: 4, category_id: 2, category: 'Transportation', activity: 'Diesel Fleet Van / Truck', unit: 'liters', factor: 0.002680, source: 'DEFRA 2026 Standards' },
+  { id: 5, category_id: 2, category: 'Transportation', activity: 'Passenger Petrol Car', unit: 'km', factor: 0.000171, source: 'EPA Emission Standards' },
+  { id: 6, category_id: 2, category: 'Transportation', activity: 'Air Travel (Short Haul)', unit: 'km', factor: 0.000255, source: 'ICAO Carbon Calculator' },
+  { id: 7, category_id: 3, category: 'Fuel', activity: 'Stationary Diesel Heating', unit: 'liters', factor: 0.002680, source: 'IPCC Guidelines' },
+  { id: 8, category_id: 3, category: 'Fuel', activity: 'Natural Gas Heating', unit: 'therms', factor: 0.005300, source: 'EPA GHG Factors' },
+  { id: 9, category_id: 3, category: 'Fuel', activity: 'LPG / Bottled Gas', unit: 'gallons', factor: 0.005720, source: 'DEFRA 2026' },
+  { id: 10, category_id: 4, category: 'Waste', activity: 'Municipal Solid Waste (Landfill)', unit: 'kg', factor: 0.000450, source: 'EPA WARM Model' },
+  { id: 11, category_id: 4, category: 'Waste', activity: 'Commercial Waste Diverted', unit: 'tonnes', factor: 0.450000, source: 'DEFRA Waste Factors' },
+  { id: 12, category_id: 5, category: 'Water', activity: 'Municipal Water Supply', unit: 'liters', factor: 0.000298, source: 'UK Water Industry Research' },
+  { id: 13, category_id: 5, category: 'Water', activity: 'Wastewater Treatment', unit: 'm³', factor: 0.298000, source: 'Water UK Carbon Accounting' },
+  { id: 14, category_id: 6, category: 'Natural Gas', activity: 'Pipeline Gas Combustion', unit: 'therms', factor: 0.005300, source: 'IPCC Stationary Fuel' },
+]
+
