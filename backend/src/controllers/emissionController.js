@@ -1,5 +1,7 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
+const fs = require('fs');
+const csv = require('csv-parser');
 
 // Helper function to find emission factor and calculate CO2e
 const calculateCO2e = async (categoryName, activity, quantity, unit) => {
@@ -250,6 +252,80 @@ exports.deleteEmission = async (req, res, next) => {
       data: null
     });
   } catch (err) {
+    next(err);
+  }
+};
+
+exports.importEmissions = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return next(new AppError('Please upload a CSV file', 400));
+    }
+
+    const results = [];
+    const errors = [];
+    
+    fs.createReadStream(req.file.path)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', async () => {
+        let successCount = 0;
+        
+        for (const [index, row] of results.entries()) {
+          try {
+            const category = row.category || row.Category;
+            const activity = row.activity || row.Activity;
+            const quantity = row.quantity || row.Quantity;
+            const unit = row.unit || row.Unit;
+            const location = row.location || row.Location || null;
+            let date = row.date || row.Date;
+
+            if (!category || !activity || !quantity || !unit) {
+               errors.push({ row: index + 2, message: 'Missing required fields' });
+               continue;
+            }
+            
+            if (!date) {
+               date = new Date().toISOString();
+            }
+
+            const { categoryId, factor, co2e } = await calculateCO2e(category, activity, quantity, unit);
+            
+            const query = `
+              INSERT INTO emission_records
+              (user_id, category_id, activity, quantity, unit, emission_factor, co2e, location, date)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `;
+            const values = [req.user.id, categoryId, activity, quantity, unit, factor, co2e, location, date];
+            
+            await db.query(query, values);
+            successCount++;
+          } catch (err) {
+             errors.push({ row: index + 2, message: err.message });
+          }
+        }
+        
+        // Clean up file
+        fs.unlinkSync(req.file.path);
+        
+        res.status(200).json({
+          status: 'success',
+          data: {
+            totalRows: results.length,
+            successCount,
+            errorCount: errors.length,
+            errors
+          }
+        });
+      })
+      .on('error', (err) => {
+         fs.unlinkSync(req.file.path);
+         next(err);
+      });
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) {
+       fs.unlinkSync(req.file.path);
+    }
     next(err);
   }
 };
