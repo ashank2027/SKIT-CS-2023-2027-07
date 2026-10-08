@@ -28,6 +28,9 @@
 #include "TaskQueue.h"
 #include "Scheduler.h"
 #include "Metrics.h"
+#include "CsvProcessor.h"
+#include "AnalyticsProcessor.h"
+#include "TaskRunner.h"
 
 #include <iostream>
 #include <memory>
@@ -410,9 +413,68 @@ static void demoMultithreading() {
 }
 
 // ============================================================================
+// DEMONSTRATION 6: Real EcoInsight Tasks (CSV Processing & Analytics)
+// ============================================================================
+static void demoRealEcoInsightTasks() {
+    printHeader("DEMO 6: REAL ECOINSIGHT TASKS (CSV & ANALYTICS)");
+
+    std::cout << "Executing real C++ background computational workers:\n";
+    std::cout << "  1. CSV_PROCESSING — parsing rows, factor lookup, quantity * factor = CO2e\n";
+    std::cout << "  2. ANALYTICS — category aggregation, timeline breakdown, top emitter\n\n";
+
+    Scheduler scheduler(SchedulingPolicy::PRIORITY, /*numWorkers=*/2);
+
+    auto tCsv = std::make_shared<Task>(601, TaskType::CSV_PROCESSING, /*priority=*/8, /*userId=*/101);
+    tCsv->setWorkFunction([] {
+        CsvProcessor processor;
+        // Process sample emissions CSV
+        auto res = processor.processFile("data/sample_emissions.csv", 101);
+        std::cout << "    [Task 601] CSV Processing Finished: "
+                  << res.validRows << " valid rows, "
+                  << res.totalCo2e << " kg CO2e computed in "
+                  << res.processingTimeMs << " ms.\n";
+        return res.success;
+    });
+
+    auto tAnalytics = std::make_shared<Task>(602, TaskType::ANALYTICS, /*priority=*/6, /*userId=*/101);
+    tAnalytics->setWorkFunction([] {
+        AnalyticsProcessor processor;
+        auto res = processor.processCsvFile("data/sample_emissions.csv");
+        std::cout << "    [Task 602] Analytics Finished: "
+                  << res.totalRecords << " records aggregated, Top category: "
+                  << res.topCategoryName << " (" << res.topCategoryCo2e << " kg CO2e).\n";
+        return res.success;
+    });
+
+    scheduler.submitTask(tCsv);
+    scheduler.submitTask(tAnalytics);
+
+    scheduler.start();
+    std::this_thread::sleep_for(300ms);
+    scheduler.stop();
+
+    std::cout << "\n--- Real Task States ---\n";
+    printTask(tCsv);
+    printTask(tAnalytics);
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
-int main() {
+int main(int argc, char* argv[]) {
+    // Check if CLI arguments were passed for direct task execution
+    auto cliOpts = TaskRunner::parseArgs(argc, argv);
+
+    if (cliOpts.showHelp) {
+        TaskRunner::printUsage(argv[0]);
+        return 0;
+    }
+
+    if (!cliOpts.isDemoMode) {
+        // Direct execution mode (used by Node.js backend)
+        return TaskRunner::execute(cliOpts);
+    }
+
     std::cout << R"(
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
@@ -420,7 +482,7 @@ int main() {
 ║   Final-Year BTech CS Project (SKIT-CS-2023-2027-07)                ║
 ║                                                                      ║
 ║   Author : Ashank Arora                                              ║
-║   Module : Scheduler MVP Demonstration                               ║
+║   Module : Scheduler MVP & Real Tasks Demonstration                  ║
 ║                                                                      ║
 ║   Algorithms:                                                        ║
 ║     1. Priority Scheduling                                           ║
@@ -432,6 +494,9 @@ int main() {
 ║     • Multiple worker threads (std::thread)                          ║
 ║     • Retry mechanism (max 3 retries)                                ║
 ║     • Scheduling metrics (wait, turnaround, throughput)              ║
+║     • Real CSV Processing Worker (factor matching & CO2e calculation)║
+║     • Real Analytics Engine (aggregation & top contributors)         ║
+║     • CLI Task Runner mode for Node.js child_process integration     ║
 ║                                                                      ║
 ║   Task Types (from shared contract):                                 ║
 ║     CSV_PROCESSING | ANALYTICS | FORECAST                            ║
@@ -455,15 +520,17 @@ int main() {
     // Demo 5: Multithreading with 4 workers
     demoMultithreading();
 
+    // Demo 6: Real EcoInsight Tasks (CSV + Analytics)
+    demoRealEcoInsightTasks();
+
     printHeader("ALL DEMONSTRATIONS COMPLETE");
 
-    std::cout << "The EcoInsight C++ Scheduler MVP has been demonstrated.\n\n";
-    std::cout << "Integration Points (future phases):\n";
-    std::cout << "  • Backend (Chetan): POST /api/tasks creates task → scheduler receives\n";
-    std::cout << "  • Database (Bhavya): tasks table persists state via backend\n";
-    std::cout << "  • Frontend (Daksh): displays task status via GET /api/tasks/:id/status\n";
-    std::cout << "  • Communication: Node.js ↔ C++ (to be implemented Jan-Feb 2027)\n";
-    std::cout << "\n";
+    std::cout << "The EcoInsight C++ Scheduler is ready for system integration!\n\n";
+    std::cout << "Integration Points:\n";
+    std::cout << "  • Backend (Chetan): invoke via CLI:\n";
+    std::cout << "      ecoinsight_scheduler.exe --type CSV_PROCESSING --input <file> --output <result.json>\n";
+    std::cout << "  • Database (Bhavya): output JSON matches tasks.result_reference format\n";
+    std::cout << "  • Frontend (Daksh): receives completed status & summary metrics\n\n";
 
     return 0;
 }

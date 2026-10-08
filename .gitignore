@@ -29,5 +29,9 @@ env/
 .DS_Store
 Thumbs.db
 
+# Local development tracking (never push to GitHub)
+LOCAL_PROGRESS_README.md
+*.local.md
+
 # Project specification text documents (uncomment if you don't want them in git)
 *.txt

@@ -298,30 +298,91 @@ The scheduler does **not** communicate directly with the frontend. All data flow
 
 ## Project Structure
 
+## 15. Real Computational Workers & CLI Integration (Phase 8)
+
+The scheduler supports **real C++ computational workers** and a **CLI Task Runner mode** designed for seamless integration with Chetan's Node.js backend.
+
+### Supported Computational Workers:
+1. **`CSV_PROCESSING` (`CsvProcessor.h / .cpp`)**:
+   - Parses CSV emission datasets.
+   - Matches activities with built-in emission factor dictionaries (`database/seed.sql` factors).
+   - Computes emission values (`Quantity × Factor = CO2e`).
+   - Produces JSON summary (`status`, `valid_rows`, `invalid_rows`, `total_co2e`, `category_breakdown`, `errors`).
+2. **`ANALYTICS` (`AnalyticsProcessor.h / .cpp`)**:
+   - Computes category distributions, monthly timeline trends, top contributors, and averages.
+   - Serializes JSON analytics ready for frontend dashboard charts.
+
+### CLI Task Runner Usage:
+```powershell
+# Run CSV processing background task
+.\ecoinsight_scheduler.exe --type CSV_PROCESSING --input data/sample_emissions.csv --output result.json --task-id 101 --priority 8
+
+# Run Analytics computation background task
+.\ecoinsight_scheduler.exe --type ANALYTICS --input data/sample_emissions.csv --output analytics.json --task-id 102 --priority 6
+
+# Run full interactive demonstration suite
+.\ecoinsight_scheduler.exe --demo
+```
+
+### Node.js Backend Integration Example:
+```javascript
+// Example in Chetan's backend controller (Node.js child_process):
+const { execFile } = require('child_process');
+
+function runSchedulerTask(taskId, inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    execFile('./scheduler/build/ecoinsight_scheduler.exe', [
+      '--type', 'CSV_PROCESSING',
+      '--task-id', String(taskId),
+      '--input', inputPath,
+      '--output', outputPath
+    ], (error, stdout) => {
+      if (error) return reject(error);
+      const result = JSON.parse(stdout);
+      resolve(result);
+    });
+  });
+}
+```
+
+---
+
+## Project Structure
+
 ```
 scheduler/
 ├── include/
-│   ├── Task.h            # Task model (aligned with DB contract)
-│   ├── TaskQueue.h       # Thread-safe task queue
-│   ├── Scheduler.h       # Scheduler engine + policy abstraction
-│   └── Metrics.h         # Performance metrics tracking
+│   ├── Task.h               # Task model (aligned with DB contract)
+│   ├── TaskQueue.h          # Thread-safe task queue
+│   ├── Scheduler.h          # Scheduler engine + policy abstraction
+│   ├── Metrics.h            # Performance metrics tracking
+│   ├── CsvProcessor.h       # CSV parsing, factor lookup & CO2e calculation
+│   ├── AnalyticsProcessor.h # Data aggregation & metrics engine
+│   └── TaskRunner.h         # CLI argument parsing & task runner
 ├── src/
-│   ├── Task.cpp          # Task implementation
-│   ├── TaskQueue.cpp     # Queue implementation (mutex + CV)
-│   ├── Scheduler.cpp     # Priority + Round Robin + retry
-│   └── Metrics.cpp       # Metrics computation + report
-├── main.cpp              # Demonstration program (5 demos)
-├── CMakeLists.txt        # CMake build configuration
-└── README.md             # This file
+│   ├── Task.cpp             # Task implementation
+│   ├── TaskQueue.cpp        # Queue implementation (mutex + CV)
+│   ├── Scheduler.cpp        # Priority + Round Robin + retry
+│   ├── Metrics.cpp          # Metrics computation + report
+│   ├── CsvProcessor.cpp     # CSV processing implementation
+│   ├── AnalyticsProcessor.cpp # Analytics computation implementation
+│   └── TaskRunner.cpp       # CLI runner implementation
+├── data/
+│   ├── sample_emissions.csv # Valid sample emission dataset
+│   └── sample_invalid.csv   # Malformed rows dataset for error testing
+├── main.cpp                 # Demonstration program (6 demos) & CLI entry point
+├── CMakeLists.txt           # CMake build configuration
+└── README.md                # This file
 ```
 
 ---
 
 ## Assumptions & Decisions
 
-1. **In-memory only:** MVP tasks exist in memory. Database persistence is handled by the backend in future phases.
-2. **Work function model:** Tasks carry a `std::function<bool()>` that workers execute. In future integration, this would invoke actual processing logic.
-3. **Round Robin simulation:** Work units simulate CPU bursts. Each quantum decrements remaining work. This models OS Round Robin faithfully.
-4. **Priority representation:** Higher numeric value = higher priority (consistent with the database `priority >= 0` constraint).
-5. **User isolation:** Each task carries a `userId` field matching the database `user_id` foreign key. The scheduler does not perform authentication (that's the backend's responsibility).
-6. **No REST API in scheduler:** The scheduler is a C++ library/executable, not a web server. The backend handles all HTTP.
+1. **Dual execution modes:** Runs interactive demonstrations (`--demo` or no args) or direct task runner mode (`--type`, `--input`, `--output`) for backend invocation.
+2. **Work function model:** Tasks carry real computational logic (`CsvProcessor`, `AnalyticsProcessor`) managed by worker threads.
+3. **Database contract compliance:** All JSON results and error summaries match Bhavya's `tasks` table columns (`result_reference`, `error_message`).
+4. **Round Robin simulation:** Work units simulate CPU bursts. Each quantum decrements remaining work. This models OS Round Robin faithfully.
+5. **Priority representation:** Higher numeric value = higher priority (consistent with the database `priority >= 0` constraint).
+6. **User isolation:** Each task carries a `userId` field matching the database `user_id` foreign key.
+
