@@ -7,11 +7,11 @@ export default function Profile() {
   const [editing, setEditing] = useState(false)
   const [toast, setToast] = useState(null)
   const [form, setForm] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    organization: user?.organization || '',
-    industry: user?.industry || '',
-    location: user?.location || '',
+    name: user?.name || 'Daksh Modi',
+    email: user?.email || 'daksh.modi@ecoinsight.org',
+    organization: user?.organization || 'EcoInsight Enterprise',
+    industry: user?.industry || 'Technology',
+    location: user?.location || 'Jaipur / Global',
   })
 
   const handleChange = (e) => {
