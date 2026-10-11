@@ -1,0 +1,6 @@
+activity,quantity,unit,category,date,location
+Grid Electricity,500.0,kWh,Electricity,2026-10-01,Jaipur
+,150.0,km,Transportation,2026-10-02,Delhi
+Diesel Car,-50.0,km,Transportation,2026-10-03,Mumbai
+Flight Domestic,invalid_qty,km,Transportation,2026-10-04,Bangalore
+Natural Gas,210.0,m3,Natural Gas,2026-10-05,Jaipur

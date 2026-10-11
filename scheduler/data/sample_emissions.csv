@@ -1,0 +1,11 @@
+activity,quantity,unit,category,date,location
+Grid Electricity,450.5,kWh,Electricity,2026-10-01,Jaipur Head Office
+Diesel Car,120.0,km,Transportation,2026-10-02,Site Delivery
+Flight Domestic,650.0,km,Transportation,2026-10-03,Client Meeting Delhi
+Diesel Fuel,85.0,litres,Fuel,2026-10-04,Backup Generator
+Municipal Waste,42.0,kg,Waste,2026-10-05,Campus Cafeteria
+Tap Water,12000.0,litres,Water,2026-10-06,Facilities Management
+Natural Gas,180.0,m3,Natural Gas,2026-10-07,Central Boiler
+Solar Power,300.0,kWh,Electricity,2026-10-08,Rooftop Array
+Petrol Car,75.0,km,Transportation,2026-10-08,Commute
+Recycled Waste,25.0,kg,Waste,2026-10-08,Office Recycling
