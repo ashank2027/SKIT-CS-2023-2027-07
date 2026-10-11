@@ -45,8 +45,8 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
-        <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
         {/* Protected routes */}
         <Route element={<Layout />}>

@@ -62,15 +62,24 @@ export default function Layout() {
             <span>Settings & Org</span>
           </NavLink>
 
-          <div className="sidebar-user" onClick={logout} title="Click to logout">
-            <div className="sidebar-user-avatar">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+          <div className="sidebar-user" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <div className="sidebar-user-avatar">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'D'}
+              </div>
+              <div className="sidebar-user-info" style={{ minWidth: 0, overflow: 'hidden' }}>
+                <p style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{user?.name || 'Daksh Modi'}</p>
+                <p style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{user?.organization || 'EcoInsight'}</p>
+              </div>
             </div>
-            <div className="sidebar-user-info">
-              <p>{user?.name || 'User'}</p>
-              <p>{user?.organization || 'Organization'}</p>
-            </div>
-            <span style={{ fontSize: '14px', cursor: 'pointer' }}>↗</span>
+            <button
+              onClick={logout}
+              className="btn btn-outline btn-sm"
+              style={{ fontSize: '11px', padding: '4px 8px', borderColor: 'var(--border-secondary)' }}
+              title="Sign out of EcoInsight"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </aside>

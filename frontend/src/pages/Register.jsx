@@ -4,7 +4,7 @@ import { AuthContext } from '../App'
 import api from '../services/api'
 
 export default function Register() {
-  const { login } = useContext(AuthContext)
+  const { user, login, logout, isAuthenticated } = useContext(AuthContext)
   const navigate = useNavigate()
   const [form, setForm] = useState({
     name: '',
@@ -52,13 +52,18 @@ export default function Register() {
       } else {
         // Dev mode fallback
         const mockUser = {
-          id: 1,
+          id: Date.now(),
           name: form.name,
           email: form.email,
-          organization: form.organization || 'Acme Corp',
+          organization: form.organization || 'EcoInsight Enterprise',
           industry: form.industry || 'Technology',
-          location: form.location || 'Global',
+          location: form.location || 'Jaipur / Global',
+          role: 'Lead Frontend Engineer & UI/UX',
         }
+        const existing = JSON.parse(localStorage.getItem('ecoinsight_registered_users') || '[]')
+        const updated = [...existing.filter(u => u.email !== mockUser.email), mockUser]
+        localStorage.setItem('ecoinsight_registered_users', JSON.stringify(updated))
+
         login(mockUser, 'dev-jwt-token-placeholder')
         navigate('/dashboard')
       }
@@ -80,6 +85,37 @@ export default function Register() {
 
           <h2 className="auth-title">Create your account</h2>
           <p className="auth-subtitle">Start tracking and reducing your carbon footprint</p>
+
+          {isAuthenticated && (
+            <div style={{
+              padding: '12px 14px', marginBottom: '16px',
+              background: 'rgba(0, 229, 160, 0.08)', border: '1px solid var(--accent-primary)',
+              borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--text-primary)',
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                👋 Currently signed in as {user?.name || 'Daksh Modi'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                You can proceed to your dashboard or sign out to register a different account.
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Go to Dashboard
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={logout}
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div style={{

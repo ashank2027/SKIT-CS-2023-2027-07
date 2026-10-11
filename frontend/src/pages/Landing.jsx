@@ -1,4 +1,6 @@
+import { useContext } from 'react'
 import { Link } from 'react-router-dom'
+import { AuthContext } from '../App'
 
 const features = [
   {
@@ -40,6 +42,8 @@ const features = [
 ]
 
 export default function Landing() {
+  const { user, isAuthenticated, logout } = useContext(AuthContext)
+
   return (
     <div className="landing-page">
       {/* Navigation */}
@@ -54,9 +58,27 @@ export default function Landing() {
           }}>🌿</div>
           <span style={{ fontWeight: 800, fontSize: 16 }}>EcoInsight</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Link to="/login" className="btn btn-outline">Sign In</Link>
-          <Link to="/register" className="btn btn-primary">Get Started</Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isAuthenticated ? (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '6px 12px', background: 'var(--bg-tertiary)',
+                borderRadius: 'var(--radius-full)', border: '1px solid var(--border-primary)',
+                fontSize: '13px',
+              }}>
+                <span className="dot" style={{ background: 'var(--accent-primary)', width: 8, height: 8 }}></span>
+                <span>{user?.name || 'Daksh Modi'}</span>
+              </div>
+              <Link to="/dashboard" className="btn btn-primary btn-sm">Dashboard</Link>
+              <button onClick={logout} className="btn btn-outline btn-sm">Sign Out</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn-outline">Sign In</Link>
+              <Link to="/register" className="btn btn-primary">Get Started</Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -73,12 +95,25 @@ export default function Landing() {
             and automated sustainability reporting — built on an OS-inspired C++ scheduling engine.
           </p>
           <div className="landing-hero-actions">
-            <Link to="/register" className="btn btn-primary btn-lg">
-              🚀 Start Free Trial
-            </Link>
-            <Link to="/login" className="btn btn-secondary btn-lg">
-              View Live Demo
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link to="/dashboard" className="btn btn-primary btn-lg">
+                  📊 Open Executive Dashboard
+                </Link>
+                <Link to="/register" className="btn btn-secondary btn-lg">
+                  Create New Account
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/register" className="btn btn-primary btn-lg">
+                  🚀 Start Free Trial (Register)
+                </Link>
+                <Link to="/login" className="btn btn-secondary btn-lg">
+                  Sign In
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Stats bar */}
@@ -134,8 +169,8 @@ export default function Landing() {
         <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
           Join organizations using EcoInsight to achieve net-zero targets with data-driven precision.
         </p>
-        <Link to="/register" className="btn btn-primary btn-lg">
-          🌍 Get Started Now
+        <Link to={isAuthenticated ? "/dashboard" : "/register"} className="btn btn-primary btn-lg">
+          {isAuthenticated ? "📊 Open Dashboard" : "🌍 Get Started Now"}
         </Link>
       </section>
 

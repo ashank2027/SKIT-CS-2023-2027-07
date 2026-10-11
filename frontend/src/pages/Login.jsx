@@ -4,7 +4,7 @@ import { AuthContext } from '../App'
 import api from '../services/api'
 
 export default function Login() {
-  const { login } = useContext(AuthContext)
+  const { user, login, logout, isAuthenticated } = useContext(AuthContext)
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
@@ -32,13 +32,25 @@ export default function Login() {
         navigate('/dashboard')
       } else {
         // Fallback for dev mode — simulate login when backend unavailable
-        const mockUser = {
+        const registeredUsers = JSON.parse(localStorage.getItem('ecoinsight_registered_users') || '[]')
+        const matched = registeredUsers.find(u => u.email.toLowerCase() === form.email.toLowerCase())
+        
+        const mockUser = matched ? {
+          id: matched.id || 1,
+          name: matched.name,
+          email: matched.email,
+          organization: matched.organization || 'EcoInsight Enterprise',
+          industry: matched.industry || 'Technology',
+          location: matched.location || 'Jaipur / Global',
+          role: matched.role || 'Enterprise User',
+        } : {
           id: 1,
-          name: 'Elena Vance',
-          email: form.email,
-          organization: 'Acme Corp (Global)',
+          name: 'Daksh Modi',
+          email: form.email || 'daksh.modi@ecoinsight.org',
+          organization: 'EcoInsight Enterprise',
           industry: 'Technology',
-          location: 'Frankfurt',
+          location: 'Jaipur / Global',
+          role: 'Lead Frontend Engineer & UI/UX',
         }
         login(mockUser, 'dev-jwt-token-placeholder')
         navigate('/dashboard')
@@ -61,6 +73,37 @@ export default function Login() {
 
           <h2 className="auth-title">Welcome back</h2>
           <p className="auth-subtitle">Sign in to your carbon intelligence dashboard</p>
+
+          {isAuthenticated && (
+            <div style={{
+              padding: '12px 14px', marginBottom: '16px',
+              background: 'rgba(0, 229, 160, 0.08)', border: '1px solid var(--accent-primary)',
+              borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--text-primary)',
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                👋 Currently signed in as {user?.name || 'Daksh Modi'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                You can proceed to your dashboard or sign out below.
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Go to Dashboard
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={logout}
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div style={{
