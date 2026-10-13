@@ -1,10 +1,10 @@
 const express = require('express');
 const categoryController = require('../controllers/categoryController');
-const { protect } = require('../middleware/authMiddleware');
+const { optionalAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.use(protect);
+router.use(optionalAuth);
 
 router.get('/', categoryController.getAllCategories);
 
