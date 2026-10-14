@@ -107,6 +107,11 @@ CREATE INDEX IF NOT EXISTS idx_emission_factors_category ON emission_factors (ca
 -- Index: factor lookups by activity name
 CREATE INDEX IF NOT EXISTS idx_emission_factors_activity ON emission_factors (activity);
 
+-- Index: fast case-insensitive activity and unit lookup index (Phase 8)
+CREATE INDEX IF NOT EXISTS idx_emission_factors_lower_activity_unit
+    ON emission_factors (category_id, LOWER(activity), LOWER(unit));
+
+
 
 -- ============================================================================
 -- 4. EMISSION_RECORDS
@@ -157,6 +162,11 @@ CREATE INDEX IF NOT EXISTS idx_emission_records_user_date ON emission_records (u
 
 -- Composite index: user + category for category breakdown per user
 CREATE INDEX IF NOT EXISTS idx_emission_records_user_category ON emission_records (user_id, category_id);
+
+-- Composite index: user + date + category for high-throughput batch and CSV queries (Phase 8)
+CREATE INDEX IF NOT EXISTS idx_emission_records_user_date_category
+    ON emission_records (user_id, date, category_id);
+
 
 
 -- ============================================================================
