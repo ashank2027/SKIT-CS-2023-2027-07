@@ -1,16 +1,29 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useState, createContext } from 'react'
+import { useState, createContext, lazy, Suspense } from 'react'
 import Layout from './components/Layout'
+
+// Eagerly loaded — needed on first paint (public routes)
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import Emissions from './pages/Emissions'
-import Calculator from './pages/Calculator'
-import Analytics from './pages/Analytics'
-import Forecast from './pages/Forecast'
-import Reports from './pages/Reports'
-import Profile from './pages/Profile'
+
+// Lazily loaded — code-split into separate chunks for smaller initial bundle
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Emissions = lazy(() => import('./pages/Emissions'))
+const Calculator = lazy(() => import('./pages/Calculator'))
+const Analytics = lazy(() => import('./pages/Analytics'))
+const Forecast = lazy(() => import('./pages/Forecast'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Profile = lazy(() => import('./pages/Profile'))
+
+/** Fallback spinner shown while lazy chunks load */
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+      <div className="loader"></div>
+    </div>
+  )
+}
 
 export const AuthContext = createContext(null)
 
@@ -42,26 +55,28 @@ function App() {
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Protected routes */}
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
-          <Route path="/emissions" element={isAuthenticated ? <Emissions /> : <Navigate to="/login" />} />
-          <Route path="/calculator" element={isAuthenticated ? <Calculator /> : <Navigate to="/login" />} />
-          <Route path="/analytics" element={isAuthenticated ? <Analytics /> : <Navigate to="/login" />} />
-          <Route path="/forecast" element={isAuthenticated ? <Forecast /> : <Navigate to="/login" />} />
-          <Route path="/reports" element={isAuthenticated ? <Reports /> : <Navigate to="/login" />} />
-          <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
-        </Route>
+          {/* Protected routes — lazy-loaded for code-splitting */}
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/emissions" element={isAuthenticated ? <Emissions /> : <Navigate to="/login" />} />
+            <Route path="/calculator" element={isAuthenticated ? <Calculator /> : <Navigate to="/login" />} />
+            <Route path="/analytics" element={isAuthenticated ? <Analytics /> : <Navigate to="/login" />} />
+            <Route path="/forecast" element={isAuthenticated ? <Forecast /> : <Navigate to="/login" />} />
+            <Route path="/reports" element={isAuthenticated ? <Reports /> : <Navigate to="/login" />} />
+            <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
+          </Route>
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+          {/* Catch-all */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Suspense>
     </AuthContext.Provider>
   )
 }
