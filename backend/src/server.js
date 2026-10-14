@@ -11,6 +11,7 @@ const emissionRoutes = require('./routes/emissionRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const calculatorRoutes = require('./routes/calculatorRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 // Middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -42,6 +43,7 @@ app.use('/api/emissions', emissionRoutes);
 app.use('/api/calculator', calculatorRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Unhandled Route Handler
 app.all('*', (req, res, next) => {
