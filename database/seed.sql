@@ -292,17 +292,86 @@ INSERT INTO emission_records (user_id, category_id, activity, quantity, unit, em
     (10, 6, 'Industrial Natural Gas', 400.0000, 'cubic_m', 2.020000, 808.0000, 'Ahmedabad, India', '2026-07-10');
 
 
+-- ============================================================================
+-- 5. AI COPILOT SEED DATA (Phase 9 — 24 October 2026)
+
+-- ============================================================================
+-- Realistic sample AI conversations & message exchanges for testing.
+-- Demonstrates user questions and AI sustainability recommendations.
+
+INSERT INTO ai_conversations (id, user_id, title, created_at, updated_at) VALUES
+    (1, 1, 'Electricity Emission Reduction Strategy', '2026-10-24 10:15:00+00', '2026-10-24 10:16:30+00'),
+    (2, 1, 'Q3 2026 Carbon Footprint Summary',        '2026-10-25 14:00:00+00', '2026-10-25 14:02:10+00'),
+    (3, 2, 'Fleet Electrification Feasibility',       '2026-10-26 11:30:00+00', '2026-10-26 11:32:45+00')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO ai_messages (conversation_id, role, content, tokens_used, created_at) VALUES
+    -- Conversation 1: User 1 (IT Industry, Bengaluru)
+    (1, 'user', 
+        'Our electricity consumption is our highest emission source in Bengaluru. What are three high-impact strategies to reduce it by 20% by next year?',
+        35, 
+        '2026-10-24 10:15:00+00'),
+    (1, 'assistant',
+        'Based on your data from Bengaluru showing high Grid Electricity usage (factor 0.82 kg CO2e/kWh):
+
+1. **Procure Rooftop Solar or Open Access PPA**: Shifting 30% of your data center and office load to solar reduces operational electricity emissions by up to 93% per kWh (0.05 vs 0.82 kg CO2e/kWh).
+2. **Optimize Server Room HVAC Setpoints**: Increasing IT server room cooling thresholds from 20°C to 24°C compliant with ASHRAE standards cuts air-conditioning power consumption by 12–15%.
+3. **Automated Sleep Policies & Smart Metering**: Deploy automated scheduled sleep states on idle workstations and peripheral equipment during non-business hours (7 PM to 7 AM).',
+        185, 
+        '2026-10-24 10:15:45+00'),
+    (1, 'user',
+        'What would be the estimated CO2e savings if we switch 5,000 kWh/month to solar?',
+        22,
+        '2026-10-24 10:16:10+00'),
+    (1, 'assistant',
+        'Switching 5,000 kWh/month from India Grid Electricity (0.82 kg CO2e/kWh) to Solar (0.05 kg CO2e/kWh) saves **3.85 tonnes of CO2e per month** (approx. **46.2 tonnes CO2e annually**), a net 93.9% emission reduction for that energy block.',
+        78,
+        '2026-10-24 10:16:30+00'),
+
+    -- Conversation 2: User 1
+    (2, 'user',
+        'Can you summarize my top emission category and month-over-month trend for Q3 2026?',
+        24,
+        '2026-10-25 14:00:00+00'),
+    (2, 'assistant',
+        'Here is your Q3 2026 analysis:
+- **Top Emission Source**: Grid Electricity accounted for **78.4%** of your total emissions across July–September.
+- **Trend**: Your emissions peaked in July (5,740 kg CO2e) and declined by **11.2% in August** (5,096 kg CO2e) following reduced office occupancy and cooling adjustments.',
+        110,
+        '2026-10-25 14:02:10+00'),
+
+    -- Conversation 3: User 2 (Manufacturing, Pune)
+    (3, 'user',
+        'How much CO2e would our manufacturing plant save by transitioning our diesel delivery vans to commercial EVs?',
+        25,
+        '2026-10-26 11:30:00+00'),
+    (3, 'assistant',
+        'For commercial fleet operations:
+- **Diesel Van**: Emits approximately **0.171 kg CO2e/km**.
+- **Electric Vehicle (BEV on Grid)**: Emits approximately **0.053 kg CO2e/km** (or near zero with renewable charging).
+- **Net Saving**: You will save **0.118 kg CO2e per kilometer**, achieving an immediate **69% operational footprint reduction** across all delivery routes.',
+        125,
+        '2026-10-26 11:32:45+00');
+
+-- Reset sequences so subsequent insertions do not conflict
+SELECT setval('ai_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_conversations));
+SELECT setval('ai_messages_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_messages));
+
+
 COMMIT;
+
 
 -- ============================================================================
 -- SEED DATA STATISTICS
 -- ============================================================================
 -- Users:              10
 -- Emission Categories: 6
--- Emission Factors:   18
+-- Emission Factors:   18 (Base) / 40+ (Phase 8 Migration)
 -- Emission Records:  123
+-- AI Conversations:   3 (Phase 9)
+-- AI Messages:        7 (Phase 9)
 --
--- Date range: March 2026 — September 2026
+-- Date range: March 2026 — October 2026
 -- Locations:  10 Indian cities
 -- Industries: IT, Manufacturing, Energy, Finance, Transportation,
 --             Healthcare, Retail, Education, Agriculture, Construction
