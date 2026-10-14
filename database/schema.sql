@@ -107,6 +107,11 @@ CREATE INDEX IF NOT EXISTS idx_emission_factors_category ON emission_factors (ca
 -- Index: factor lookups by activity name
 CREATE INDEX IF NOT EXISTS idx_emission_factors_activity ON emission_factors (activity);
 
+-- Index: fast case-insensitive activity and unit lookup index (Phase 8)
+CREATE INDEX IF NOT EXISTS idx_emission_factors_lower_activity_unit
+    ON emission_factors (category_id, LOWER(activity), LOWER(unit));
+
+
 
 -- ============================================================================
 -- 4. EMISSION_RECORDS
@@ -157,6 +162,11 @@ CREATE INDEX IF NOT EXISTS idx_emission_records_user_date ON emission_records (u
 
 -- Composite index: user + category for category breakdown per user
 CREATE INDEX IF NOT EXISTS idx_emission_records_user_category ON emission_records (user_id, category_id);
+
+-- Composite index: user + date + category for high-throughput batch and CSV queries (Phase 8)
+CREATE INDEX IF NOT EXISTS idx_emission_records_user_date_category
+    ON emission_records (user_id, date, category_id);
+
 
 
 -- ============================================================================
@@ -255,6 +265,61 @@ CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status);
 
 
 -- ============================================================================
+-- 7. AI_CONVERSATIONS (Phase 9 — 24 October 2026)
+-- ============================================================================
+-- Stores AI chat sessions for users with the EcoInsight AI Copilot.
+-- Consumed by: POST /api/ai/chat, GET /api/ai/conversations
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ai_conversations (
+    id              SERIAL PRIMARY KEY,
+    user_id         INTEGER         NOT NULL
+                        REFERENCES users (id)
+                        ON DELETE CASCADE
+                        ON UPDATE CASCADE,
+    title           VARCHAR(255)    NOT NULL DEFAULT 'New Conversation',
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Index: user-scoped conversation history
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_updated
+    ON ai_conversations (user_id, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user
+    ON ai_conversations (user_id);
+
+
+-- ============================================================================
+-- 8. AI_MESSAGES (Phase 9 — 24 October 2026)
+-- ============================================================================
+-- Stores individual message turns (user query, Gemini assistant response).
+-- Consumed by: POST /api/ai/chat, GET /api/ai/conversations/:id
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ai_messages (
+    id              SERIAL PRIMARY KEY,
+    conversation_id INTEGER         NOT NULL
+                        REFERENCES ai_conversations (id)
+                        ON DELETE CASCADE
+                        ON UPDATE CASCADE,
+    role            VARCHAR(20)     NOT NULL
+                        CHECK (role IN ('user', 'assistant', 'system')),
+    content         TEXT            NOT NULL,
+    tokens_used     INTEGER         DEFAULT 0
+                        CHECK (tokens_used >= 0),
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Index: ordered conversation message retrieval
+CREATE INDEX IF NOT EXISTS idx_ai_messages_convo_created
+    ON ai_messages (conversation_id, created_at ASC);
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation
+    ON ai_messages (conversation_id);
+
+
+-- ============================================================================
 -- TRIGGER: auto-update updated_at on row modification
 -- ============================================================================
 
@@ -287,8 +352,14 @@ CREATE TRIGGER trg_reports_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER trg_ai_conversations_updated_at
+    BEFORE UPDATE ON ai_conversations
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 
 COMMIT;
+
 
 -- ============================================================================
 -- END OF SCHEMA

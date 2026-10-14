@@ -54,41 +54,83 @@ INSERT INTO emission_categories (name, description) VALUES
 
 
 -- ============================================================================
--- EMISSION FACTORS (18 factors across 6 categories)
+-- EMISSION FACTORS (Expanded Dataset: 40+ factors across 6 categories)
 -- ============================================================================
--- Sources: IPCC, EPA, India GHG Program (approximations for development)
+-- Sources: IPCC AR6, EPA GHG Hub 2024, UK DEFRA 2024, India CEA Database 2024
 -- factor = kg CO2e per unit
 
 INSERT INTO emission_factors (category_id, activity, unit, factor, source) VALUES
-    -- Electricity (category 1)
-    (1, 'Grid Electricity',              'kWh',      0.820000, 'India CEA CO2 Baseline Database 2023'),
-    (1, 'Solar Electricity',             'kWh',      0.050000, 'IPCC AR6 Lifecycle Estimates'),
-    (1, 'Wind Electricity',              'kWh',      0.011000, 'IPCC AR6 Lifecycle Estimates'),
+    -- Category 1: Electricity
+    (1, 'Grid Electricity',              'kWh',          0.820000, 'India CEA CO2 Baseline Database 2024'),
+    (1, 'Grid Electricity',              'MWh',        820.000000, 'India CEA CO2 Baseline Database 2024'),
+    (1, 'Solar Electricity',             'kWh',          0.050000, 'IPCC AR6 Lifecycle Estimates'),
+    (1, 'Solar Electricity',             'MWh',         50.000000, 'IPCC AR6 Lifecycle Estimates'),
+    (1, 'Wind Electricity',              'kWh',          0.011000, 'IPCC AR6 Lifecycle Estimates'),
+    (1, 'Wind Electricity',              'MWh',         11.000000, 'IPCC AR6 Lifecycle Estimates'),
+    (1, 'Hydroelectric Power',           'kWh',          0.024000, 'IPCC AR6 Lifecycle Estimates'),
+    (1, 'Hydroelectric Power',           'MWh',         24.000000, 'IPCC AR6 Lifecycle Estimates'),
+    (1, 'Coal Grid Electricity',         'kWh',          1.020000, 'EPA Greenhouse Gas Equivalencies'),
 
-    -- Transportation (category 2)
-    (2, 'Petrol Car',                    'km',       0.192000, 'UK DEFRA 2023 Emission Factors'),
-    (2, 'Diesel Car',                    'km',       0.171000, 'UK DEFRA 2023 Emission Factors'),
-    (2, 'Domestic Flight',               'km',       0.246000, 'ICAO Carbon Emissions Calculator'),
-    (2, 'Train Travel',                  'km',       0.041000, 'Indian Railways Sustainability Report'),
+    -- Category 2: Transportation
+    (2, 'Petrol Car',                    'km',           0.192000, 'UK DEFRA 2024 Emission Factors'),
+    (2, 'Petrol Car',                    'mile',         0.309000, 'UK DEFRA 2024 Emission Factors'),
+    (2, 'Diesel Car',                    'km',           0.171000, 'UK DEFRA 2024 Emission Factors'),
+    (2, 'Diesel Car',                    'mile',         0.275000, 'UK DEFRA 2024 Emission Factors'),
+    (2, 'Electric Vehicle (EV)',         'km',           0.053000, 'UK DEFRA 2024 Grid-Average EV'),
+    (2, 'Electric Vehicle (EV)',         'mile',         0.085000, 'UK DEFRA 2024 Grid-Average EV'),
+    (2, 'Heavy Diesel Truck',            'km',           0.892000, 'EPA SmartWay Transport Partnership'),
+    (2, 'Heavy Diesel Truck',            'mile',         1.435000, 'EPA SmartWay Transport Partnership'),
+    (2, 'Domestic Flight',               'km',           0.246000, 'ICAO Carbon Emissions Calculator'),
+    (2, 'Domestic Flight',               'passenger_mile', 0.396000, 'ICAO Carbon Emissions Calculator'),
+    (2, 'International Flight',          'km',           0.158000, 'ICAO Carbon Emissions Calculator'),
+    (2, 'International Flight',          'passenger_mile', 0.254000, 'ICAO Carbon Emissions Calculator'),
+    (2, 'Train Travel',                  'km',           0.041000, 'Indian Railways Sustainability Report'),
+    (2, 'Train Travel',                  'mile',         0.066000, 'Indian Railways Sustainability Report'),
+    (2, 'Motorbike',                     'km',           0.113000, 'UK DEFRA 2024 Emission Factors'),
+    (2, 'Motorbike',                     'mile',         0.182000, 'UK DEFRA 2024 Emission Factors'),
+    (2, 'City Bus',                      'passenger_km', 0.103000, 'UK DEFRA 2024 Transit Bus'),
 
-    -- Fuel (category 3)
-    (3, 'Diesel Combustion',             'litre',    2.680000, 'IPCC 2006 Guidelines'),
-    (3, 'Petrol Combustion',             'litre',    2.310000, 'IPCC 2006 Guidelines'),
-    (3, 'LPG Combustion',               'kg',       2.983000, 'IPCC 2006 Guidelines'),
+    -- Category 3: Fuel
+    (3, 'Diesel Combustion',             'litre',        2.680000, 'IPCC 2006 / EPA 2024 Guidelines'),
+    (3, 'Diesel Combustion',             'gallon',      10.140000, 'EPA GHG Emission Factors Hub'),
+    (3, 'Petrol Combustion',             'litre',        2.310000, 'IPCC 2006 / EPA 2024 Guidelines'),
+    (3, 'Petrol Combustion',             'gallon',       8.740000, 'EPA GHG Emission Factors Hub'),
+    (3, 'LPG Combustion',               'kg',           2.983000, 'IPCC 2006 Guidelines'),
+    (3, 'LPG Combustion',               'litre',        1.557000, 'UK DEFRA 2024 Fuel Factors'),
+    (3, 'Heavy Fuel Oil',                'litre',        3.150000, 'IPCC 2006 Guidelines'),
+    (3, 'Heavy Fuel Oil',                'gallon',      11.920000, 'EPA GHG Emission Factors Hub'),
+    (3, 'Kerosene / Jet Fuel',           'litre',        2.540000, 'IPCC 2006 Guidelines'),
+    (3, 'Kerosene / Jet Fuel',           'gallon',       9.610000, 'EPA GHG Emission Factors Hub'),
+    (3, 'Bituminous Coal',               'kg',           2.420000, 'IPCC 2006 Guidelines'),
+    (3, 'Bituminous Coal',               'tonne',     2420.000000, 'IPCC 2006 Guidelines'),
 
-    -- Waste (category 4)
-    (4, 'General Waste to Landfill',     'kg',       0.587000, 'EPA WARM Model v15'),
-    (4, 'Recycled Waste',                'kg',       0.021000, 'EPA WARM Model v15'),
-    (4, 'Composting',                    'kg',       0.010000, 'EPA WARM Model v15'),
+    -- Category 4: Waste
+    (4, 'General Waste to Landfill',     'kg',           0.587000, 'EPA WARM Model v15'),
+    (4, 'General Waste to Landfill',     'tonne',      587.000000, 'EPA WARM Model v15'),
+    (4, 'Recycled Waste',                'kg',           0.021000, 'EPA WARM Model v15'),
+    (4, 'Recycled Waste',                'tonne',       21.000000, 'EPA WARM Model v15'),
+    (4, 'Composting',                    'kg',           0.010000, 'EPA WARM Model v15'),
+    (4, 'Composting',                    'tonne',       10.000000, 'EPA WARM Model v15'),
+    (4, 'Anaerobic Digestion',           'kg',           0.085000, 'UK DEFRA 2024 Waste Factors'),
+    (4, 'Incineration with Energy Recovery', 'kg',       0.215000, 'UK DEFRA 2024 Waste Factors'),
 
-    -- Water (category 5)
-    (5, 'Municipal Water Supply',        'kl',       0.344000, 'Water Services Association Guidelines'),
-    (5, 'Wastewater Treatment',          'kl',       0.708000, 'Water Services Association Guidelines'),
+    -- Category 5: Water
+    (5, 'Municipal Water Supply',        'kl',           0.344000, 'Water Services Association Guidelines'),
+    (5, 'Municipal Water Supply',        'cubic_m',      0.344000, 'Water Services Association Guidelines'),
+    (5, 'Wastewater Treatment',          'kl',           0.708000, 'Water Services Association Guidelines'),
+    (5, 'Wastewater Treatment',          'cubic_m',      0.708000, 'Water Services Association Guidelines'),
+    (5, 'Desalinated Water Supply',      'kl',           1.250000, 'Global Water Sustainability Benchmark'),
 
-    -- Natural Gas (category 6)
-    (6, 'Natural Gas Heating',           'cubic_m',  2.020000, 'IPCC 2006 Guidelines'),
-    (6, 'Natural Gas Cooking',           'cubic_m',  2.020000, 'IPCC 2006 Guidelines'),
-    (6, 'Industrial Natural Gas',        'cubic_m',  2.020000, 'IPCC 2006 Guidelines');
+    -- Category 6: Natural Gas
+    (6, 'Natural Gas Heating',           'cubic_m',      2.020000, 'IPCC 2006 Guidelines'),
+    (6, 'Natural Gas Heating',           'therm',        5.300000, 'EPA GHG Emission Factors Hub'),
+    (6, 'Natural Gas Heating',           'kWh',          0.202000, 'UK DEFRA 2024 Fuel Factors'),
+    (6, 'Natural Gas Cooking',           'cubic_m',      2.020000, 'IPCC 2006 Guidelines'),
+    (6, 'Natural Gas Cooking',           'therm',        5.300000, 'EPA GHG Emission Factors Hub'),
+    (6, 'Industrial Natural Gas',        'cubic_m',      2.020000, 'IPCC 2006 Guidelines'),
+    (6, 'Industrial Natural Gas',        'therm',        5.300000, 'EPA GHG Emission Factors Hub')
+ON CONFLICT (category_id, activity, unit) DO NOTHING;
+
 
 
 -- ============================================================================
@@ -250,17 +292,86 @@ INSERT INTO emission_records (user_id, category_id, activity, quantity, unit, em
     (10, 6, 'Industrial Natural Gas', 400.0000, 'cubic_m', 2.020000, 808.0000, 'Ahmedabad, India', '2026-07-10');
 
 
+-- ============================================================================
+-- 5. AI COPILOT SEED DATA (Phase 9 — 24 October 2026)
+
+-- ============================================================================
+-- Realistic sample AI conversations & message exchanges for testing.
+-- Demonstrates user questions and AI sustainability recommendations.
+
+INSERT INTO ai_conversations (id, user_id, title, created_at, updated_at) VALUES
+    (1, 1, 'Electricity Emission Reduction Strategy', '2026-10-24 10:15:00+00', '2026-10-24 10:16:30+00'),
+    (2, 1, 'Q3 2026 Carbon Footprint Summary',        '2026-10-25 14:00:00+00', '2026-10-25 14:02:10+00'),
+    (3, 2, 'Fleet Electrification Feasibility',       '2026-10-26 11:30:00+00', '2026-10-26 11:32:45+00')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO ai_messages (conversation_id, role, content, tokens_used, created_at) VALUES
+    -- Conversation 1: User 1 (IT Industry, Bengaluru)
+    (1, 'user', 
+        'Our electricity consumption is our highest emission source in Bengaluru. What are three high-impact strategies to reduce it by 20% by next year?',
+        35, 
+        '2026-10-24 10:15:00+00'),
+    (1, 'assistant',
+        'Based on your data from Bengaluru showing high Grid Electricity usage (factor 0.82 kg CO2e/kWh):
+
+1. **Procure Rooftop Solar or Open Access PPA**: Shifting 30% of your data center and office load to solar reduces operational electricity emissions by up to 93% per kWh (0.05 vs 0.82 kg CO2e/kWh).
+2. **Optimize Server Room HVAC Setpoints**: Increasing IT server room cooling thresholds from 20°C to 24°C compliant with ASHRAE standards cuts air-conditioning power consumption by 12–15%.
+3. **Automated Sleep Policies & Smart Metering**: Deploy automated scheduled sleep states on idle workstations and peripheral equipment during non-business hours (7 PM to 7 AM).',
+        185, 
+        '2026-10-24 10:15:45+00'),
+    (1, 'user',
+        'What would be the estimated CO2e savings if we switch 5,000 kWh/month to solar?',
+        22,
+        '2026-10-24 10:16:10+00'),
+    (1, 'assistant',
+        'Switching 5,000 kWh/month from India Grid Electricity (0.82 kg CO2e/kWh) to Solar (0.05 kg CO2e/kWh) saves **3.85 tonnes of CO2e per month** (approx. **46.2 tonnes CO2e annually**), a net 93.9% emission reduction for that energy block.',
+        78,
+        '2026-10-24 10:16:30+00'),
+
+    -- Conversation 2: User 1
+    (2, 'user',
+        'Can you summarize my top emission category and month-over-month trend for Q3 2026?',
+        24,
+        '2026-10-25 14:00:00+00'),
+    (2, 'assistant',
+        'Here is your Q3 2026 analysis:
+- **Top Emission Source**: Grid Electricity accounted for **78.4%** of your total emissions across July–September.
+- **Trend**: Your emissions peaked in July (5,740 kg CO2e) and declined by **11.2% in August** (5,096 kg CO2e) following reduced office occupancy and cooling adjustments.',
+        110,
+        '2026-10-25 14:02:10+00'),
+
+    -- Conversation 3: User 2 (Manufacturing, Pune)
+    (3, 'user',
+        'How much CO2e would our manufacturing plant save by transitioning our diesel delivery vans to commercial EVs?',
+        25,
+        '2026-10-26 11:30:00+00'),
+    (3, 'assistant',
+        'For commercial fleet operations:
+- **Diesel Van**: Emits approximately **0.171 kg CO2e/km**.
+- **Electric Vehicle (BEV on Grid)**: Emits approximately **0.053 kg CO2e/km** (or near zero with renewable charging).
+- **Net Saving**: You will save **0.118 kg CO2e per kilometer**, achieving an immediate **69% operational footprint reduction** across all delivery routes.',
+        125,
+        '2026-10-26 11:32:45+00');
+
+-- Reset sequences so subsequent insertions do not conflict
+SELECT setval('ai_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_conversations));
+SELECT setval('ai_messages_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_messages));
+
+
 COMMIT;
+
 
 -- ============================================================================
 -- SEED DATA STATISTICS
 -- ============================================================================
 -- Users:              10
 -- Emission Categories: 6
--- Emission Factors:   18
+-- Emission Factors:   18 (Base) / 40+ (Phase 8 Migration)
 -- Emission Records:  123
+-- AI Conversations:   3 (Phase 9)
+-- AI Messages:        7 (Phase 9)
 --
--- Date range: March 2026 — September 2026
+-- Date range: March 2026 — October 2026
 -- Locations:  10 Indian cities
 -- Industries: IT, Manufacturing, Energy, Finance, Transportation,
 --             Healthcare, Retail, Education, Agriculture, Construction
