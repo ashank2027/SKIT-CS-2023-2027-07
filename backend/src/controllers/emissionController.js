@@ -1,3 +1,123 @@
+/**
+ * ============================================================
+ * FILE: src/controllers/emissionController.js
+ * ROLE: Emission Records CRUD + Bulk CSV Import Controller
+ * ============================================================
+ *
+ * This is the largest and most feature-rich controller in the project. It manages
+ * every operation on carbon emission records that belong to the logged-in user.
+ * All endpoints require authentication via the `protect` middleware. The controller
+ * is mounted on /api/emissions by server.js via emissionRoutes.js.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * PRIVATE CONSTANTS & HELPERS
+ * ──────────────────────────────────────────────────────────────
+ *
+ * DEFAULT_FACTORS (object)
+ *   A hardcoded map of category name → { factor, source, unit }. Used as the
+ *   last-resort fallback when the database emission_factors table has no matching
+ *   entry for a given category. Factor values are sourced from internationally
+ *   recognised standards: India CEA, GHG Protocol, IPCC 2006, UK DEFRA/EPA,
+ *   EPA WARM, and Water Services Association Guidelines.
+ *   Categories: Electricity (0.82 kg CO₂e/kWh), Transportation (0.192/km),
+ *   Fuel (2.68/litre), Waste (0.587/kg), Water (0.344/kl), Natural Gas (2.02/m³).
+ *
+ * resolveCategory(categoryInput) → { id, name }
+ *   An async helper that resolves a flexible category identifier (which can be
+ *   either a numeric ID string or a category name string) to a concrete category
+ *   object. First tries an integer-based lookup by ID; if the input is not
+ *   numeric, falls back to a case-insensitive ILIKE name match. Returns null
+ *   if no match is found. Used by createEmission, updateEmission, and calculateCO2e.
+ *
+ * calculateCO2e(categoryInput, activity, quantity, unit) → { categoryId, categoryName, factor, source, co2e }
+ *   The core computation helper shared between createEmission and updateEmission.
+ *   Implements a 4-tier factor-matching algorithm against the emission_factors table:
+ *     Tier 1: Exact match on both activity (ILIKE partial) AND unit.
+ *     Tier 2: Partial activity match only (ignores unit).
+ *     Tier 3: Unit match only within the same category.
+ *     Tier 4: Any factor in the category (takes the first by ID, as a last resort).
+ *   If none of the 4 tiers return a result, falls back to DEFAULT_FACTORS.
+ *   Finally computes: co2e = round(quantity × factor, 4 decimal places).
+ *
+ * ──────────────────────────────────────────────────────────────
+ * EXPORTED HANDLERS
+ * ──────────────────────────────────────────────────────────────
+ *
+ * exports.createEmission  — POST /api/emissions
+ *   Creates a single new emission record for the authenticated user.
+ *   Accepts category as a numeric ID or a string name (flexible for frontend).
+ *   Required fields: category, activity, quantity (positive number), unit, date.
+ *   Optional: location.
+ *   The client MAY optionally pre-supply emission_factor and co2e (e.g. from
+ *   the calculator page); if they are missing, calculateCO2e() is called to
+ *   derive them server-side, ensuring calculation integrity.
+ *   Inserts into emission_records and returns the saved row enriched with the
+ *   category name as HTTP 201.
+ *
+ * exports.getEmissions  — GET /api/emissions
+ *   Returns a paginated, filterable list of the authenticated user's emission
+ *   records. Supports the following query parameters:
+ *     category / category_id : Filter by category (name or ID).
+ *     location               : Partial match on the location field.
+ *     from / to              : Date range filter (inclusive, ISO date strings).
+ *     search / activity      : Partial text match on the activity field.
+ *     limit / offset         : Pagination (default: limit=50, offset=0).
+ *   Also executes a separate COUNT query (with the same filters applied) to
+ *   return the total number of matching records for pagination UI.
+ *   Returns: { status, data, emissions, total }.
+ *
+ * exports.getEmission  — GET /api/emissions/:id
+ *   Fetches a single emission record by its primary key, scoped to the
+ *   authenticated user (WHERE id = $1 AND user_id = $2 prevents cross-user
+ *   data access). Returns HTTP 404 if not found or not owned by the requester.
+ *
+ * exports.updateEmission  — PUT /api/emissions/:id
+ *   Updates an existing emission record. Similar to createEmission but first
+ *   checks that the record exists and belongs to the authenticated user.
+ *   Any combination of fields can be updated; unchanged fields are preserved
+ *   by falling back to the existing row values (fetched with a pre-update SELECT).
+ *   Re-runs calculateCO2e() whenever category, activity, quantity, or unit change,
+ *   keeping the stored co2e value always consistent with the factor table.
+ *   Returns the updated row joined with its category name.
+ *
+ * exports.deleteEmission  — DELETE /api/emissions/:id
+ *   Permanently removes an emission record. Scoped to the authenticated user.
+ *   Returns HTTP 404 if the record doesn't exist or doesn't belong to the user.
+ *   Returns HTTP 200 with { status: 'success', data: null } on successful deletion.
+ *
+ * exports.importEmissions  — POST /api/emissions/import  (multipart/form-data)
+ *   Bulk CSV import endpoint that accepts a CSV file uploaded via multipart form
+ *   (field name: "file") and processes every row as a new emission record.
+ *
+ *   Full Import Flow:
+ *     1. Validates that a file was uploaded (multer stores it at uploads/).
+ *     2. Creates a tracking entry in the `tasks` table with status 'RUNNING'.
+ *        This allows the frontend to poll /api/tasks/:id/status for progress.
+ *     3. Pre-fetches ALL emission categories and emission factors from the DB
+ *        into in-memory Maps/arrays. This avoids one DB round-trip per CSV row,
+ *        dramatically improving throughput for large files.
+ *     4. Streams and parses the CSV using the csv-parser library. Flexible
+ *        column naming is supported (e.g. "category" OR "emission_category" OR
+ *        "category_name"; "quantity" OR "amount" OR "usage"; etc.).
+ *     5. For each row: validates required fields, resolves the category,
+ *        finds the best matching emission factor using the same 4-tier logic
+ *        as calculateCO2e but using the pre-loaded in-memory data, computes
+ *        co2e, and inserts a row into emission_records.
+ *     6. Skipped/failed rows are collected into an errors array (up to 30 shown).
+ *     7. Deletes the uploaded temporary file after parsing is complete.
+ *     8. Updates the task row to 'COMPLETED' (or 'FAILED' if 0 rows succeeded)
+ *        with a JSON result_reference containing success/error counts and co2e sum.
+ *     9. Returns a summary response: { imported, skipped, totalCO2e, data }.
+ *
+ * DATABASE TABLES:
+ *   emission_records      — primary table (user's CO₂ data).
+ *   emission_categories   — referenced for category resolution.
+ *   emission_factors      — referenced for CO₂e factor lookup.
+ *   tasks                 — updated to track import job status.
+ *
+ * DEPENDENCIES: database (pg pool), AppError, fs (Node.js), csv-parser, multer.
+ * ============================================================
+ */
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const fs = require('fs');

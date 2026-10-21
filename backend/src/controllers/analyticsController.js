@@ -1,3 +1,97 @@
+/**
+ * ============================================================
+ * FILE: src/controllers/analyticsController.js
+ * ROLE: Advanced Multi-Dimensional Analytics Controller
+ * ============================================================
+ *
+ * This controller powers the dedicated Analytics page in the EcoInsight
+ * frontend. Unlike the dashboard (which returns a fixed summary snapshot),
+ * this controller accepts flexible query filters and returns multiple datasets
+ * needed to render a variety of charts and tables simultaneously. All data is
+ * scoped to the authenticated user. Mounted on /api/analytics via
+ * analyticsRoutes.js, protected by the `protect` middleware.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * PRIVATE CONSTANTS
+ * ──────────────────────────────────────────────────────────────
+ *
+ * PALETTE_COLORS (array)
+ *   Six hex color values matching the EcoInsight frontend design system.
+ *   Assigned in round-robin order to category/sector chart segments.
+ *
+ * SCOPE_DEFINITIONS (array of objects)
+ *   Defines the three GHG Protocol scopes used by this application:
+ *     Scope 1 (Direct)         — Fuel, Natural Gas → fill: #ff7043 (orange)
+ *     Scope 2 (Indirect Energy)— Electricity       → fill: #00e5a0 (green)
+ *     Scope 3 (Value Chain)    — Transportation, Waste, Water → fill: #7c4dff (purple)
+ *   Each scope object also carries a human-readable description shown in the
+ *   scope breakdown table on the analytics page.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * EXPORTED HANDLER
+ * ──────────────────────────────────────────────────────────────
+ *
+ * exports.getAnalytics  — GET /api/analytics
+ *   The single handler for this controller. Accepts the following optional
+ *   query parameters to filter all returned datasets simultaneously:
+ *     from     : ISO date string — only include records on or after this date.
+ *     to       : ISO date string — only include records on or before this date.
+ *     category : Category name or numeric ID to filter to a single category.
+ *     location : Partial text match on the emission record's location field.
+ *     sector   : Filter by GHG scope — accepts "Scope 1"/"direct",
+ *                "Scope 2"/"indirect", or "Scope 3"/"value".
+ *     industry : Filter by the user account's industry field (partial match).
+ *
+ *   A dynamic WHERE clause (baseFilters / filterValues) is built from the
+ *   provided params and reused across most queries to keep filtering consistent.
+ *
+ *   ── 5 Datasets Returned ──
+ *
+ *   1. emissionsByTime  (array of { period, value, prevYear })
+ *      Monthly totals using a CTE that also computes the previous year's value
+ *      for the same month (by shifting dates forward 1 year and LEFT JOINing).
+ *      Enables a dual-line "actual vs. previous year" trend chart.
+ *      Sorted chronologically by month.
+ *
+ *   2. emissionsByCategory  (array of { name, value, recordCount, fill })
+ *      Total co2e per emission category. Only includes categories with co2e > 0
+ *      (HAVING clause). Each entry includes the number of emission records for
+ *      that category (useful for tooltips) and a chart fill color.
+ *      Sorted descending by total value. Powers the category bar/pie chart.
+ *
+ *   3. emissionsByLocation  (array of { name, value })
+ *      Total co2e per location string, sorted descending. Enables a location-
+ *      based breakdown chart showing which facilities/sites emit the most.
+ *      Null locations are excluded (WHERE er.location IS NOT NULL).
+ *
+ *   4. emissionsByIndustry  (array of { name, value, percentage })
+ *      Cross-user aggregation: groups ALL users' emission records by the
+ *      industry field of their user accounts. This gives a benchmark view
+ *      showing how the current user's industry stacks up against others.
+ *      Each entry includes the percentage share of the total across all industries.
+ *      NOTE: This query uses its own simpler filter (only from/to date range,
+ *      no user scoping) because it is intentionally cross-user for benchmarking.
+ *
+ *   5. emissionsBySector  (array of { name, value, fill, description })
+ *      Aggregates emissionsByCategory results into the 3 GHG scopes defined in
+ *      SCOPE_DEFINITIONS. Computed in JavaScript (no extra DB query) by summing
+ *      the matching category values already retrieved in dataset #2. Powers the
+ *      Scope 1/2/3 comparison chart on the analytics page.
+ *
+ *   FULL RESPONSE (HTTP 200):
+ *     {
+ *       status: 'success',
+ *       emissionsByTime, emissionsByCategory, emissionsByLocation,
+ *       emissionsByIndustry, emissionsBySector,
+ *       data: { ...same five datasets }   (duplicated for frontend compatibility)
+ *     }
+ *
+ * DATABASE TABLES:
+ *   emission_records (primary), emission_categories (joined), users (joined).
+ *
+ * DEPENDENCIES: database (pg pool).
+ * ============================================================
+ */
 const db = require('../config/database');
 
 // Colors matching frontend theme

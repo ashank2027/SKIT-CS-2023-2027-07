@@ -1,3 +1,97 @@
+/**
+ * ============================================================
+ * FILE: src/controllers/dashboardController.js
+ * ROLE: Dashboard Aggregation Controller (Summary KPIs + Charts)
+ * ============================================================
+ *
+ * This controller powers the main EcoInsight dashboard page. It fetches and
+ * aggregates emission data from multiple angles — totals, trends, category
+ * breakdowns, GHG scope allocations, and recent records — and packages them
+ * into a single JSON payload so the frontend can render the entire dashboard
+ * with one API call. All data is scoped to the authenticated user via `req.user.id`.
+ * Mounted on /api/dashboard via dashboardRoutes.js, protected by `protect` middleware.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * PRIVATE CONSTANTS
+ * ──────────────────────────────────────────────────────────────
+ *
+ * CATEGORY_SCOPES (object)
+ *   Maps lowercase category names to their GHG Protocol scope classification:
+ *     Electricity  → Scope 2 (purchased energy — indirect)
+ *     Fuel         → Scope 1 (direct combustion)
+ *     Natural Gas  → Scope 1 (direct combustion)
+ *     Transportation → Scope 3 (value chain / travel)
+ *     Waste        → Scope 3 (waste disposal)
+ *     Water        → Scope 3 (water treatment)
+ *   Used to label each category on the dashboard and compute the GHG allocation.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * EXPORTED HANDLER
+ * ──────────────────────────────────────────────────────────────
+ *
+ * exports.getDashboard  — GET /api/dashboard
+ *   Executes 6 database queries in sequence and assembles a rich payload.
+ *
+ *   Query 1 — Summary KPIs (using PostgreSQL CTEs):
+ *     Uses multiple CTEs (WITH clauses) to compute in a single DB round-trip:
+ *       - total_emissions  : Lifetime sum of all co2e for the user.
+ *       - current_month    : Sum of co2e for the current calendar month.
+ *       - previous_month   : Sum of co2e for the month before current.
+ *       - fallback_current / fallback_previous : Used when the current month has
+ *         no data — falls back to the latest month that has data so the UI
+ *         always shows something meaningful even for users with old data.
+ *       - highest          : The category with the highest total co2e.
+ *     The percentage change between current and previous period is then
+ *     computed in JavaScript: ((current - prev) / prev) × 100.
+ *     If prev = 0 and current > 0, returns 100% (new data this period).
+ *
+ *   Query 2 — Recent Records:
+ *     Fetches the 5 most recent emission records (by date DESC, then created_at
+ *     DESC as tiebreaker) for the "Recent Activity" table widget. Each record
+ *     is enriched with an `audit: 'Verified'` flag for the UI.
+ *
+ *   Query 3 — Monthly Trend:
+ *     Groups all emission records by calendar month (DATE_TRUNC) and sums co2e,
+ *     returning up to 12 months of data in chronological order. Used to render
+ *     the line/bar trend chart on the dashboard.
+ *
+ *   Query 4 — Category Breakdown:
+ *     Aggregates total co2e per emission category using a LEFT JOIN so categories
+ *     with zero emissions also appear. Categories with zero total are filtered
+ *     out via HAVING. Each row is assigned a chart color from the PALETTE array
+ *     and its GHG scope label from CATEGORY_SCOPES. Used for the doughnut chart.
+ *
+ *   Query 5 — GHG Scope Allocation (computed from Query 4 results):
+ *     Sums co2e values for scope 1 (Fuel + Natural Gas), scope 2 (Electricity),
+ *     and scope 3 (Transportation + Waste + Water) categories. Computes percentage
+ *     share of total. Used for the Scope 1/2/3 stacked bar or gauge widget.
+ *     If there is no data at all, falls back to placeholder percentages (20/48/32).
+ *
+ *   Query 6 — Ingested CSV Count:
+ *     Counts how many CSV_PROCESSING tasks with status 'COMPLETED' exist for the
+ *     user in the `tasks` table. This counter is shown as "Ingested CSVs" on the
+ *     dashboard system metrics panel. Wrapped in try/catch so a missing `tasks`
+ *     table does not crash the entire dashboard response.
+ *
+ *   FULL RESPONSE PAYLOAD (HTTP 200):
+ *     {
+ *       totalEmissions, currentPeriod, previousPeriod, percentageChange,
+ *       highestCategory: { name, scope, value, facility },
+ *       kernelEfficiency, kernelWorkers, ingestedCSVs, netZeroCap, factorConfidence,
+ *       recentRecords,
+ *       trend:            [ { month, actual } ],
+ *       categoryBreakdown:[ { name, value, scope, color } ],
+ *       ghgAllocation:    { scope1, scope2, scope3 },   (percentages, sum = 100)
+ *       projectedQ4, reductionVelocity, actualYTD,
+ *       data: { ...same fields }   (duplicated for frontend compatibility)
+ *     }
+ *
+ * DATABASE TABLES:
+ *   emission_records (primary), emission_categories (joined), tasks (counted).
+ *
+ * DEPENDENCIES: database (pg pool).
+ * ============================================================
+ */
 const db = require('../config/database');
 
 const CATEGORY_SCOPES = {
