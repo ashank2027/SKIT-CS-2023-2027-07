@@ -1,8 +1,94 @@
 /**
- * EcoInsight Backend API Tests
- * Author: Chetan Sharma (Node.js / REST API)
- * Covers: Health, Auth, Users, Categories, Emission Factors, Calculator, Emissions CRUD,
- * CSV Import, Tasks API, Dashboard, and Advanced Analytics.
+ * ============================================================
+ * FILE: src/tests/api.test.js
+ * ROLE: Backend Test Suite (Unit + Integration)
+ * ============================================================
+ *
+ * This is the single test file for the EcoInsight backend. It uses Node.js's
+ * built-in `assert` module (no external test framework like Jest or Mocha) to
+ * keep dependencies minimal. The suite is executed with:
+ *   npm test   →  node src/tests/api.test.js
+ *
+ * Tests are grouped into two categories:
+ *   A) Unit / Validation Tests — run every time, with or without DB.
+ *   B) Live Integration Tests  — only run if a PostgreSQL connection is available.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * TEST RUNNER INFRASTRUCTURE
+ * ──────────────────────────────────────────────────────────────
+ *
+ * runTests() — async entry-point function. Maintains `passed` and `failed` counters.
+ *
+ * test(name, fn) — helper wrapper that calls fn() and catches any thrown errors.
+ *   On success: logs "✓ name" and increments passed.
+ *   On failure: logs "✕ name" plus the error message and increments failed.
+ *   After all tests, exits with code 1 if any test failed (for CI/CD integration).
+ *
+ * ──────────────────────────────────────────────────────────────
+ * UNIT / VALIDATION TESTS (always run — no DB required)
+ * ──────────────────────────────────────────────────────────────
+ *
+ * Test 1: Auth — Password Hashing & JWT Generation
+ *   Verifies that bcryptjs correctly hashes a password and that the hash can be
+ *   successfully compared to the original. Also signs a JWT with a 1-hour expiry
+ *   and verifies it decodes to the same user ID, confirming the JWT sign/verify
+ *   cycle works end-to-end without a database.
+ *
+ * Test 2: Calculator Controller — Input Validation
+ *   Directly invokes calculatorController.calculate() with a mock req/res to
+ *   test that the controller rejects invalid inputs BEFORE any DB call:
+ *     - Missing activity/quantity/unit → AppError HTTP 400.
+ *     - Negative quantity (-50) → AppError HTTP 400.
+ *   Confirms the validation logic in the controller is independent of the DB.
+ *
+ * Test 3: Task Controller — Task Type & Status Validation
+ *   Directly invokes taskController.createTask() and taskController.updateTaskStatus()
+ *   with invalid enum values:
+ *     - task_type = 'INVALID_TYPE' → AppError HTTP 400.
+ *     - status = 'INVALID_STATUS' → AppError HTTP 400.
+ *   Validates that the controller's whitelist enforcement works without a DB.
+ *
+ * Test 4: Emission Controller — Emission Creation & Import Validation
+ *   Directly invokes emissionController.createEmission() and importEmissions():
+ *     - Missing activity/quantity/unit/date → AppError HTTP 400.
+ *     - importEmissions called without req.file (no upload) → AppError HTTP 400.
+ *   Validates that both handlers guard against bad input before touching the DB.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * LIVE INTEGRATION TESTS (only if PostgreSQL is reachable)
+ * ──────────────────────────────────────────────────────────────
+ *
+ * Before the integration tests, the suite runs `db.query('SELECT 1')` to detect
+ * whether a live PostgreSQL connection is available. If it fails, a helpful
+ * informational message is printed and the integration block is skipped entirely
+ * (the suite still passes its unit tests and exits 0).
+ *
+ * Live Test 5: Reference Categories
+ *   Queries `emission_categories` and asserts at least 6 rows exist — the 6
+ *   standard categories seeded by the database migration.
+ *
+ * Live Test 6: Emission Factors with Category Names
+ *   Queries emission_factors with a JOIN to emission_categories and asserts
+ *   at least 10 rows exist, verifying the seed data is complete.
+ *
+ * Live Test 7: Calculator with Factor Lookup
+ *   Invokes calculatorController.calculate() against a live DB with a real
+ *   category (Electricity, 500 kWh). Asserts that the returned co2e > 0
+ *   and that the category name in the response is 'Electricity'.
+ *
+ * Live Test 8: Task Lifecycle
+ *   Picks the first user from the DB and creates a real CSV_PROCESSING task
+ *   via taskController.createTask(). Asserts a task ID is returned, then
+ *   immediately deletes the test task to avoid polluting the database.
+ *
+ * ──────────────────────────────────────────────────────────────
+ * EXIT CODE:
+ *   0 — all tests passed.
+ *   1 — one or more tests failed (triggers CI/CD pipeline failures).
+ *
+ * DEPENDENCIES: assert (Node.js built-in), bcryptjs, jsonwebtoken,
+ *               and the application's own controllers and db config.
+ * ============================================================
  */
 
 const assert = require('assert');
