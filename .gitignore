@@ -47,13 +47,12 @@ pids
 # Local development tracking & personal notes (never push to GitHub)
 LOCAL_PROGRESS_README.md
 *.local.md
-Bhavya_Work_Roadmap_And_Checklist.txt
-Bhavya_Task_Status_Report.txt
 *.status.txt
-*Roadmap*.txt
-*Task_Status*.txt
 personal_notes/
 local_notes/
 
-# Project specification text documents
+# Project specification text documents (keep master checklist and status report tracked)
 *.txt
+!Bhavya_Work_Roadmap_And_Checklist.txt
+!Bhavya_Task_Status_Report.txt
+
