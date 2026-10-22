@@ -326,24 +326,44 @@ The scheduler supports **real C++ computational workers** and a **CLI Task Runne
 
 ### Node.js Backend Integration Example:
 ```javascript
-// Example in Chetan's backend controller (Node.js child_process):
-const { execFile } = require('child_process');
+// Using the production bridge module (scheduler/scripts/schedulerBridge.js):
+const schedulerBridge = require('./schedulerBridge');
 
-function runSchedulerTask(taskId, inputPath, outputPath) {
-  return new Promise((resolve, reject) => {
-    execFile('./scheduler/build/ecoinsight_scheduler.exe', [
-      '--type', 'CSV_PROCESSING',
-      '--task-id', String(taskId),
-      '--input', inputPath,
-      '--output', outputPath
-    ], (error, stdout) => {
-      if (error) return reject(error);
-      const result = JSON.parse(stdout);
-      resolve(result);
-    });
+async function handleCsvUpload(req, res) {
+  const result = await schedulerBridge.runTask({
+    type: 'CSV_PROCESSING',
+    taskId: req.body.taskId,
+    userId: req.user.id,
+    inputPath: req.file.path,
+    outputPath: `uploads/results/task_${req.body.taskId}.json`,
+    priority: 8
   });
+  res.json(result.data);
 }
 ```
+
+---
+
+## 16. End-to-End Pipeline Verification (14–16 October Milestone)
+
+The integration pipeline has been verified across the full stack:
+
+1. **Automated Verification Suite (`scheduler/scripts/verify_pipeline.js`)**:
+   - Executes 17 end-to-end assertions covering CSV parsing, emission factor multiplication, corrupt input detection, database contract compliance, and CLI argument parsing.
+   - Run verification suite:
+     ```bash
+     node scheduler/scripts/verify_pipeline.js
+     ```
+
+2. **Corrupt CSV Handling & Fault Tolerance**:
+   - Tested against `scheduler/data/sample_invalid.csv` with malformed rows (empty activities, negative quantities, non-numeric values).
+   - Generates structured error outputs matching `tasks.error_message` and `tasks.result_reference` in PostgreSQL.
+
+3. **Database Schema Compliance**:
+   - JSON output fields strictly map to Bhavya's `tasks` table:
+     - `tasks.status`: `QUEUED` → `RUNNING` → `COMPLETED` / `FAILED` / `RETRYING`
+     - `tasks.result_reference`: serialized summary JSON (`valid_rows`, `total_co2e_kg`, `category_breakdown`)
+     - `tasks.error_message`: detailed error description if processing fails
 
 ---
 
@@ -370,6 +390,9 @@ scheduler/
 ├── data/
 │   ├── sample_emissions.csv # Valid sample emission dataset
 │   └── sample_invalid.csv   # Malformed rows dataset for error testing
+├── scripts/
+│   ├── verify_pipeline.js   # Automated Node.js integration verification suite
+│   └── schedulerBridge.js   # Production Node.js child_process bridge module
 ├── main.cpp                 # Demonstration program (6 demos) & CLI entry point
 ├── CMakeLists.txt           # CMake build configuration
 └── README.md                # This file
