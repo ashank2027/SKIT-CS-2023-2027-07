@@ -311,6 +311,10 @@ The scheduler supports **real C++ computational workers** and a **CLI Task Runne
 2. **`ANALYTICS` (`AnalyticsProcessor.h / .cpp`)**:
    - Computes category distributions, monthly timeline trends, top contributors, and averages.
    - Serializes JSON analytics ready for frontend dashboard charts.
+3. **`AI_ANALYSIS` (`AiAnalysisProcessor.h / .cpp`)** *(Phase 9)*:
+   - Performs statistical deviation checks and anomaly detection across emission categories.
+   - Formulates tailored decarbonization recommendations with feasibility, priority, and projected CO2e savings.
+   - Implements external API rate-limit resilience (HTTP 429 quota throttling) with exponential backoff and automatic retry coordination.
 
 ### CLI Task Runner Usage:
 ```powershell
@@ -320,7 +324,10 @@ The scheduler supports **real C++ computational workers** and a **CLI Task Runne
 # Run Analytics computation background task
 .\ecoinsight_scheduler.exe --type ANALYTICS --input data/sample_emissions.csv --output analytics.json --task-id 102 --priority 6
 
-# Run full interactive demonstration suite
+# Run AI background analysis with rate-limit resilience testing
+.\ecoinsight_scheduler.exe --type AI_ANALYSIS --input data/sample_emissions.csv --output ai_result.json --task-id 103 --priority 9 --simulate-rate-limit
+
+# Run full interactive demonstration suite (7 demos)
 .\ecoinsight_scheduler.exe --demo
 ```
 
@@ -367,35 +374,50 @@ The integration pipeline has been verified across the full stack:
 
 ---
 
+## 17. AI Background Processing & Rate-Limit Resilience (Phase 9 — October End)
+
+The C++ Scheduler integrates a dedicated AI Background Worker (`AiAnalysisProcessor`) designed for heavy background analytical jobs triggered by Chetan's `/api/ai` backend and Daksh's AI Copilot UI.
+
+### Key Capabilities:
+- **Anomaly Detection**: Evaluates current emissions against commercial benchmark baselines (`m_industryBaselines`), tagging anomalies with severity levels (`CRITICAL`, `HIGH`, `MEDIUM`).
+- **Actionable Recommendations**: Synthesizes structured decarbonization strategies (Solar PPA, IoT HVAC setback, fleet electrification, zero-waste composting) with quantified abatement projections (kg CO2e) and ROI horizons.
+- **External API Rate-Limit Resilience**: When an external LLM API (e.g. Gemini) returns HTTP 429 Too Many Requests or quota limits, the worker triggers transient failure. The OS Scheduler intercepts this, transitions the task to `TaskStatus::RETRYING`, applies exponential backoff, increments `retry_count`, and safely requeues the task until success or reaching `MAX_RETRIES = 3`.
+- **Database Output Format**: Serializes into `tasks.result_reference` with `executive_summary`, `anomalies[]`, `recommendations[]`, and `execution_time_ms`.
+
+---
+
 ## Project Structure
 
 ```
 scheduler/
 ├── include/
-│   ├── Task.h               # Task model (aligned with DB contract)
-│   ├── TaskQueue.h          # Thread-safe task queue
-│   ├── Scheduler.h          # Scheduler engine + policy abstraction
-│   ├── Metrics.h            # Performance metrics tracking
-│   ├── CsvProcessor.h       # CSV parsing, factor lookup & CO2e calculation
-│   ├── AnalyticsProcessor.h # Data aggregation & metrics engine
-│   └── TaskRunner.h         # CLI argument parsing & task runner
+│   ├── Task.h                 # Task model (aligned with DB contract)
+│   ├── TaskQueue.h            # Thread-safe task queue
+│   ├── Scheduler.h            # Scheduler engine + policy abstraction
+│   ├── Metrics.h              # Performance metrics tracking
+│   ├── CsvProcessor.h         # CSV parsing, factor lookup & CO2e calculation
+│   ├── AnalyticsProcessor.h   # Data aggregation & metrics engine
+│   ├── AiAnalysisProcessor.h  # AI background worker & anomaly detection
+│   └── TaskRunner.h           # CLI argument parsing & task runner
 ├── src/
-│   ├── Task.cpp             # Task implementation
-│   ├── TaskQueue.cpp        # Queue implementation (mutex + CV)
-│   ├── Scheduler.cpp        # Priority + Round Robin + retry
-│   ├── Metrics.cpp          # Metrics computation + report
-│   ├── CsvProcessor.cpp     # CSV processing implementation
+│   ├── Task.cpp               # Task implementation
+│   ├── TaskQueue.cpp          # Queue implementation (mutex + CV)
+│   ├── Scheduler.cpp          # Priority + Round Robin + retry
+│   ├── Metrics.cpp            # Metrics computation + report
+│   ├── CsvProcessor.cpp       # CSV processing implementation
 │   ├── AnalyticsProcessor.cpp # Analytics computation implementation
-│   └── TaskRunner.cpp       # CLI runner implementation
+│   ├── AiAnalysisProcessor.cpp# AI background worker implementation
+│   └── TaskRunner.cpp         # CLI runner implementation
 ├── data/
-│   ├── sample_emissions.csv # Valid sample emission dataset
-│   └── sample_invalid.csv   # Malformed rows dataset for error testing
+│   ├── sample_emissions.csv   # Valid sample emission dataset
+│   ├── sample_invalid.csv     # Malformed rows dataset for error testing
+│   └── sample_ai_input.json   # Sample profile for AI background analysis
 ├── scripts/
-│   ├── verify_pipeline.js   # Automated Node.js integration verification suite
-│   └── schedulerBridge.js   # Production Node.js child_process bridge module
-├── main.cpp                 # Demonstration program (6 demos) & CLI entry point
-├── CMakeLists.txt           # CMake build configuration
-└── README.md                # This file
+│   ├── verify_pipeline.js     # Automated Node.js integration verification suite
+│   └── schedulerBridge.js     # Production Node.js child_process bridge module
+├── main.cpp                   # Demonstration program (7 demos) & CLI entry point
+├── CMakeLists.txt             # CMake build configuration
+└── README.md                  # This file
 ```
 
 ---

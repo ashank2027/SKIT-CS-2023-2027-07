@@ -30,6 +30,7 @@
 #include "Metrics.h"
 #include "CsvProcessor.h"
 #include "AnalyticsProcessor.h"
+#include "AiAnalysisProcessor.h"
 #include "TaskRunner.h"
 
 #include <iostream>
@@ -459,6 +460,52 @@ static void demoRealEcoInsightTasks() {
 }
 
 // ============================================================================
+// DEMONSTRATION 7: AI Background Analysis Task & Rate-Limit Resilience (Phase 9)
+// ============================================================================
+static void demoAiBackgroundTasks() {
+    printHeader("DEMO 7: AI BACKGROUND ANALYSIS & RATE-LIMIT RESILIENCE (PHASE 9)");
+
+    std::cout << "Task: AI_ANALYSIS background computation with anomaly detection.\n";
+    std::cout << "Resilience: Demonstrates catching external AI API rate limits (HTTP 429),\n";
+    std::cout << "transitioning to RETRYING, applying exponential backoff, and succeeding on retry.\n\n";
+
+    Scheduler scheduler(SchedulingPolicy::PRIORITY, /*numWorkers=*/2);
+
+    auto tAi = std::make_shared<Task>(701, TaskType::AI_ANALYSIS, /*priority=*/8, /*userId=*/301);
+
+    static std::atomic<int> attemptCounter{0};
+    tAi->setWorkFunction([]() -> bool {
+        attemptCounter++;
+        AiAnalysisProcessor processor;
+
+        if (attemptCounter == 1) {
+            std::cout << "    [Task 701] Attempt 1: Contacting AI LLM API (Gemini)... Rate limit encountered (HTTP 429).\n";
+            std::cout << "    [Task 701] Transient failure triggered -> scheduler initiates backoff & retry.\n";
+            return false; // Trigger Scheduler retry
+        }
+
+        std::cout << "    [Task 701] Attempt 2: Retry after backoff... API connection successful!\n";
+        auto res = processor.analyzeCsvFile("data/sample_emissions.csv", 701, 301, /*simulateRateLimit=*/false);
+        std::cout << "    [Task 701] AI Analysis Completed in " << res.executionTimeMs << " ms.\n";
+        std::cout << "    [Task 701] Executive Summary: " << res.executiveSummary << "\n";
+        std::cout << "    [Task 701] Generated " << res.recommendations.size() << " actionable carbon mitigation recommendations.\n";
+        return res.success;
+    });
+
+    std::cout << "--- Submitting AI_ANALYSIS Task with Priority 8 ---\n";
+    printTask(tAi);
+
+    scheduler.submitTask(tAi);
+    scheduler.start();
+
+    std::this_thread::sleep_for(400ms);
+    scheduler.stop();
+
+    std::cout << "\n--- Final AI Task State ---\n";
+    printTask(tAi);
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 int main(int argc, char* argv[]) {
@@ -496,6 +543,8 @@ int main(int argc, char* argv[]) {
 ║     • Scheduling metrics (wait, turnaround, throughput)              ║
 ║     • Real CSV Processing Worker (factor matching & CO2e calculation)║
 ║     • Real Analytics Engine (aggregation & top contributors)         ║
+║     • AI Background Analysis Worker (anomaly detection & mitigation) ║
+║     • API Rate-Limit Resilience (exponential backoff & auto-retry)   ║
 ║     • CLI Task Runner mode for Node.js child_process integration     ║
 ║                                                                      ║
 ║   Task Types (from shared contract):                                 ║
@@ -523,12 +572,16 @@ int main(int argc, char* argv[]) {
     // Demo 6: Real EcoInsight Tasks (CSV + Analytics)
     demoRealEcoInsightTasks();
 
+    // Demo 7: AI Background Tasks & Rate-Limit Resilience (Phase 9)
+    demoAiBackgroundTasks();
+
     printHeader("ALL DEMONSTRATIONS COMPLETE");
 
     std::cout << "The EcoInsight C++ Scheduler is ready for system integration!\n\n";
     std::cout << "Integration Points:\n";
     std::cout << "  • Backend (Chetan): invoke via CLI:\n";
     std::cout << "      ecoinsight_scheduler.exe --type CSV_PROCESSING --input <file> --output <result.json>\n";
+    std::cout << "      ecoinsight_scheduler.exe --type AI_ANALYSIS --input <file> --output <result.json>\n";
     std::cout << "  • Database (Bhavya): output JSON matches tasks.result_reference format\n";
     std::cout << "  • Frontend (Daksh): receives completed status & summary metrics\n\n";
 

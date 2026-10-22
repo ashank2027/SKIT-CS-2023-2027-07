@@ -35,3 +35,4 @@ LOCAL_PROGRESS_README.md
 
 # Project specification text documents (uncomment if you don't want them in git)
 *.txt
+!CMakeLists.txt
