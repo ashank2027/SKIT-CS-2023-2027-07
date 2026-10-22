@@ -302,7 +302,9 @@ INSERT INTO emission_records (user_id, category_id, activity, quantity, unit, em
 INSERT INTO ai_conversations (id, user_id, title, created_at, updated_at) VALUES
     (1, 1, 'Electricity Emission Reduction Strategy', '2026-10-24 10:15:00+00', '2026-10-24 10:16:30+00'),
     (2, 1, 'Q3 2026 Carbon Footprint Summary',        '2026-10-25 14:00:00+00', '2026-10-25 14:02:10+00'),
-    (3, 2, 'Fleet Electrification Feasibility',       '2026-10-26 11:30:00+00', '2026-10-26 11:32:45+00')
+    (3, 2, 'Fleet Electrification Feasibility',       '2026-10-26 11:30:00+00', '2026-10-26 11:32:45+00'),
+    (4, 1, 'Scope 3 Supply Chain Logistics & Packaging', '2026-11-02 09:30:00+00', '2026-11-02 09:33:15+00'),
+    (5, 3, 'Water Recycling & Effluent Treatment Savings', '2026-11-04 16:15:00+00', '2026-11-04 16:17:20+00')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO ai_messages (conversation_id, role, content, tokens_used, created_at) VALUES
@@ -351,7 +353,39 @@ INSERT INTO ai_messages (conversation_id, role, content, tokens_used, created_at
 - **Electric Vehicle (BEV on Grid)**: Emits approximately **0.053 kg CO2e/km** (or near zero with renewable charging).
 - **Net Saving**: You will save **0.118 kg CO2e per kilometer**, achieving an immediate **69% operational footprint reduction** across all delivery routes.',
         125,
-        '2026-10-26 11:32:45+00');
+        '2026-10-26 11:32:45+00'),
+
+    -- Conversation 4: User 1 (02 Nov 2026 — Supply Chain & Packaging Search Targets)
+    (4, 'user',
+        'We want to evaluate low-carbon alternatives for our domestic freight logistics and cardboard packaging waste.',
+        21,
+        '2026-11-02 09:30:00+00'),
+    (4, 'assistant',
+        'Key levers for Scope 3 freight and waste decarbonization:
+1. **Modal Shift to Rail**: Shifting long-haul freight from Heavy Diesel Trucks (0.892 kg CO2e/km) to Electric Freight Rail (0.041 kg CO2e/km) eliminates 95% of transit emissions.
+2. **Closed-Loop Recycled Packaging**: Recycling corrugated cardboard emits only 0.021 kg CO2e/kg compared to 0.587 kg CO2e/kg for landfill disposal, yielding a 96.4% lifecycle footprint reduction.',
+        142,
+        '2026-11-02 09:31:40+00'),
+    (4, 'user',
+        'Can you calculate the carbon credit offset potential if we recycle 10 tonnes of cardboard per quarter?',
+        20,
+        '2026-11-02 09:32:30+00'),
+    (4, 'assistant',
+        'Recycling 10 tonnes (10,000 kg) of cardboard avoids 5.66 tonnes of CO2e per quarter (22.64 tonnes CO2e annually) versus landfill methane generation.',
+        65,
+        '2026-11-02 09:33:15+00'),
+
+    -- Conversation 5: User 3 (04 Nov 2026 — Textile & Water Conservation)
+    (5, 'user',
+        'How does on-site industrial wastewater treatment compare against municipal discharge in terms of GHG footprint?',
+        19,
+        '2026-11-04 16:15:00+00'),
+    (5, 'assistant',
+        'Wastewater treatment emissions analysis:
+- **Standard Wastewater Treatment**: Factors indicate 0.708 kg CO2e/kl treated.
+- **Bioreactor with Methane Capture**: Capturing bio-gas reduces net lifecycle emissions to approximately 0.280 kg CO2e/kl, while generating reusable heat energy for factory boilers.',
+        118,
+        '2026-11-04 16:17:20+00');
 
 -- Reset sequences so subsequent insertions do not conflict
 SELECT setval('ai_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_conversations));
@@ -368,10 +402,10 @@ COMMIT;
 -- Emission Categories: 6
 -- Emission Factors:   18 (Base) / 40+ (Phase 8 Migration)
 -- Emission Records:  123
--- AI Conversations:   3 (Phase 9)
--- AI Messages:        7 (Phase 9)
+-- AI Conversations:   5 (Phase 9 — to 05 Nov 2026)
+-- AI Messages:       13 (Phase 9 — to 05 Nov 2026)
 --
--- Date range: March 2026 — October 2026
+-- Date range: March 2026 — November 2026
 -- Locations:  10 Indian cities
 -- Industries: IT, Manufacturing, Energy, Finance, Transportation,
 --             Healthcare, Retail, Education, Agriculture, Construction

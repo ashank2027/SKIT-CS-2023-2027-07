@@ -1,0 +1,359 @@
+================================================================================
+ECOINSIGHT (SKIT-CS-2023-2027-07) — MASTER DATABASE WORK ROADMAP & CHECKLIST
+Lead Engineer: Bhavya Chautharamani (PostgreSQL / Database / Data Architecture)
+Team Members : Ashank Arora (C++ Scheduler), Daksh Modi (Frontend UI/UX),
+               Chetan Sharma (Backend Node/Express)
+Project Span : 10 August 2026 – 15 March 2027
+Current Date : 05 November 2026 (Active Phase 9 Progress)
+Status       : 100% On-Schedule Across All Completed & Current Milestones
+================================================================================
+
+TABLE OF CONTENTS:
+1. MASTER TIMELINE SUMMARY (PHASES 1 TO 13)
+2. COMPLETED WORK & DETAILED CHECKLIST (10 AUG 2026 – 05 NOV 2026)
+   - Phase 1: Database Research & Entity Identification (10–16 Aug)
+   - Phase 2: Requirements, Constraints & Data Dictionary v1 (17–23 Aug)
+   - Phase 3: System Database Architecture & Migration Design (24–30 Aug)
+   - Phase 4: Development Foundation & Initial Core Tables (31 Aug–6 Sep)
+   - Phase 5: Authentication & User Integrity Layer (7–13 Sep)
+   - Phase 6: Emission Module & Aggregation Foundation (14–20 Sep)
+   - Phase 7: Integrated MVP Milestone & Realistic Seed Dataset (21–26 Sep)
+   - Phase 8: Carbon Calculator + CSV Import + Advanced Analytics (27 Sep–23 Oct) [COMPLETED]
+   - Phase 9: AI Copilot Architecture & Prompt Context Engine (24–27 Oct) [COMPLETED]
+   - Phase 9: AI Copilot Search & Token Rate-Limiting (28 Oct–05 Nov) [COMPLETED]
+3. FUTURE WORK & DATE-WISE ROADMAP CHECKLIST (06 NOV 2026 – 15 MAR 2027)
+   - Phase 9 : AI Copilot Streaming & Integration Support (06 Nov–20 Nov)
+   - Phase 10: Forecasting Data Layer & Historical Feeds (21 Nov–18 Dec)
+   - Phase 11: Reports & PDF Export Metadata (19 Dec–16 Jan)
+   - Phase 12: Full C++ Scheduler Integration & Concurrency Tuning (17 Jan–14 Feb)
+   - Phase 13: Final DB Testing, EXPLAIN ANALYZE, ERD & Submission (15 Feb–15 Mar)
+4. CROSS-TEAM CONTRACTS & DEPENDENCY MATRIX
+5. DATABASE REPOSITORY ARTIFACT MAP & FILE DIRECTORY
+
+================================================================================
+1. MASTER TIMELINE SUMMARY (PHASES 1 TO 13)
+================================================================================
+
++--------+------------------------+----------------------------------------------+---------------+
+| Phase  | Date Range             | Phase Name / Core Objective                  | Status        |
++--------+------------------------+----------------------------------------------+---------------+
+| Phase 1| 10 Aug – 16 Aug 2026   | Database Initiation & Entity Research        | [✓] COMPLETED |
+| Phase 2| 17 Aug – 23 Aug 2026   | Database SRS, Constraints & Data Dictionary  | [✓] COMPLETED |
+| Phase 3| 24 Aug – 30 Aug 2026   | System Database Architecture & DDL Design    | [✓] COMPLETED |
+| Phase 4| 31 Aug – 06 Sep 2026   | Core Database Foundation & Table DDL         | [✓] COMPLETED |
+| Phase 5| 07 Sep – 13 Sep 2026   | User Auth Data & Security Constraints        | [✓] COMPLETED |
+| Phase 6| 14 Sep – 20 Sep 2026   | Emission CRUD & Basic Aggregation Queries    | [✓] COMPLETED |
+| Phase 7| 21 Sep – 26 Sep 2026   | Integrated MVP Milestone & Full Seed Dataset | [✓] COMPLETED |
+| Phase 8| 27 Sep – 23 Oct 2026   | Calculator, CSV Import & Advanced Analytics  | [✓] COMPLETED |
+| Phase 9| 24 Oct – 20 Nov 2026   | AI Copilot Storage, Search & Rate Limiting   | [✓] COMPLETED (To 05 Nov) |
+| Phase 10| 21 Nov – 18 Dec 2026  | Forecast History & Predictive CO2e Tables    | [ ] UPCOMING  |
+| Phase 11| 19 Dec – 16 Jan 2027  | Report Metadata & PDF Generation Audits      | [ ] UPCOMING  |
+| Phase 12| 17 Jan – 14 Feb 2027  | C++ Scheduler Queue & Concurrency Locking    | [ ] UPCOMING  |
+| Phase 13| 15 Feb – 15 Mar 2027  | Final DB Benchmarks, EXPLAIN ANALYZE & ERD   | [ ] UPCOMING  |
++--------+------------------------+----------------------------------------------+---------------+
+
+================================================================================
+2. COMPLETED WORK & DETAILED CHECKLIST (10 AUG 2026 – 05 NOV 2026)
+================================================================================
+
+--------------------------------------------------------------------------------
+[✓] PHASE 1: DATABASE RESEARCH & ENTITY IDENTIFICATION (10–16 AUGUST 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Identify all environmental entities, relations, and data requirements.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Analyzed GHG Protocol (Scope 1, Scope 2, Scope 3) and emission accounting standards.
+[✓] Identified 6 primary core entities: `users`, `emission_categories`,
+    `emission_factors`, `emission_records`, `tasks`, and `reports`.
+[✓] Identified future AI and predictive entities: `ai_conversations`,
+    `ai_messages`, and `forecasts`.
+[✓] Mapped entity relationships (1:N users-to-records, 1:N categories-to-factors,
+    1:N categories-to-records, 1:N users-to-tasks, 1:N users-to-reports).
+[✓] Drafted Conceptual Entity-Relationship Diagram (ERD v1).
+
+--------------------------------------------------------------------------------
+[✓] PHASE 2: REQUIREMENTS, CONSTRAINTS & DATA DICTIONARY v1 (17–23 AUGUST 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Define precise PostgreSQL data types, primary keys, foreign keys, and indexes.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Defined Primary Keys (standardized on BIGSERIAL/SERIAL for compact indexing).
+[✓] Defined Foreign Key constraints with explicit ON DELETE CASCADE and RESTRICT behaviors.
+[✓] Formulated Data Dictionary detailing every column, data type, nullability,
+    default values, and check constraints (e.g., quantity > 0, factor >= 0, co2e >= 0).
+[✓] Coordinated API-to-Database field contract with Chetan (Node.js backend) to prevent
+    field renaming mismatches (e.g., `user_id`, `co2e`, `emission_factor`).
+[✓] Finalized ERD v2 with complete relational cardinality.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 3: SYSTEM DATABASE ARCHITECTURE & MIGRATION DESIGN (24–30 AUGUST 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Structure the database directory, versioned migrations, and seed pipelines.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Established modular database directory tree:
+    `database/schema.sql`, `database/seed.sql`, `database/migrations/`, `database/queries/`.
+[✓] Created migration rollback protocol with pairs of forward (`.sql`) and reverse (`_down.sql`).
+[✓] Designed automated `updated_at` trigger function (`update_updated_at_column()`) to
+    guarantee record update auditing without relying on application-level clocks.
+[✓] Configured PostgreSQL connection parameters and environment variables (`.env`).
+
+--------------------------------------------------------------------------------
+[✓] PHASE 4: DEVELOPMENT FOUNDATION & INITIAL CORE TABLES (31 AUG – 06 SEP 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Implement core tables in PostgreSQL and verify local connection from backend.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Created migration `001_initial_schema.sql` (and rollback `001_initial_schema_down.sql`).
+[✓] Implemented table `users` with email uniqueness and format checks.
+[✓] Implemented table `emission_categories` with 6 core environmental sectors.
+[✓] Implemented table `emission_factors` with unique (category_id, activity, unit) constraint.
+[✓] Implemented table `emission_records` with ON DELETE CASCADE foreign key.
+[✓] Preemptively structured `tasks` and `reports` foundation tables for C++ and PDF jobs.
+[✓] Verified end-to-end connectivity with Chetan's Node.js `pg` connection pool.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 5: AUTHENTICATION & USER INTEGRITY LAYER (07–13 SEPTEMBER 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Secure user registration, login query speeds, and profile management queries.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Created SQL query library `database/queries/users.sql`:
+    - `find_user_by_email`: Index-optimized user retrieval for JWT auth.
+    - `find_user_by_id`: Fast profile retrieval excluding `password_hash`.
+    - `create_user`: Parameterized user insertion returning user metadata.
+    - `update_user_profile`: Dynamic profile field updating.
+    - `change_user_password`: Secure password hash rotation.
+    - `delete_user`: Clean cascading account deletion.
+[✓] Created unique index `idx_users_email` on `LOWER(email)` for case-insensitive uniqueness.
+[✓] Tested duplicate registration attempts, null field violations, and injection safety.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 6: EMISSION MODULE & AGGREGATION FOUNDATION (14–20 SEPTEMBER 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Enable emission record CRUD, multi-criteria filtering, and basic metric queries.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Created SQL query library `database/queries/emissions.sql`:
+    - `insert_emission_record`: Atomic emission creation with calculated CO2e.
+    - `get_emissions_paginated`: User-scoped listing with pagination (LIMIT/OFFSET).
+    - `get_emissions_filtered`: Dynamic filtering by date range, category, and location.
+    - `get_emission_by_id`: User-isolated single record retrieval.
+    - `update_emission_record`: Mutation with automatic `updated_at` trigger execution.
+    - `delete_emission_record`: Hard deletion with user ownership validation.
+[✓] Created performance indexes: `idx_emission_records_user`, `idx_emission_records_date`, `idx_emission_records_category`.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 7: INTEGRATED MVP MILESTONE & REALISTIC SEED DATASET (21–26 SEPTEMBER 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Deliver production-grade MVP database supporting dashboard charts and analytics.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Created SQL query library `database/queries/dashboard.sql`:
+    - `get_total_emissions`: Lifetime CO2e summary for user.
+    - `get_monthly_emissions_trend`: Time-series monthly aggregation over rolling 12 months.
+    - `get_emissions_by_category`: Breakdown with percentages for pie/donut charts.
+    - `get_recent_records`: Fast query for dashboard activity feed table.
+    - `get_mom_change`: Month-over-Month emission percentage increase/decrease calculation.
+    - `get_top_emission_sources`: Highest emitting activities ranked descending.
+[✓] Built comprehensive development seed file `database/seed.sql` with 10 users and 120+ multi-month records.
+[✓] Authored complete database documentation in `database/README.md`.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 8: CALCULATOR + CSV + ADVANCED ANALYTICS (27 SEP – 23 OCT 2026) [COMPLETED]
+--------------------------------------------------------------------------------
+OBJECTIVE: Expand emission factors to 40+, build CSV bulk import queries, and deliver
+           cross-dimensional enterprise analytics queries.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Authored Migration `002_phase8_calculator_csv_expansion.sql` (and rollback `_down.sql`).
+[✓] Massive Emission Factor Expansion (40+ Global Scientific Factors):
+    - Electricity: US Grid Average, UK DEFRA 2024, India Grid Mix (CEA 2024), Solar & Wind.
+    - Transportation: Petrol Car, Diesel Car, EV, Flights, Freight Truck, Container Ship.
+    - Fuel & Energy: Diesel, Gasoline, LPG, Heavy Fuel Oil, Coal.
+    - Natural Gas: By m3, kWh, and therms.
+    - Waste & Water: Municipal landfill, recycling, composting, tap water, wastewater treatment.
+[✓] Fast Fuzzy & Unit Lookup Indexes:
+    - Added `idx_emission_factors_lower_activity_unit` on `(category_id, LOWER(activity), LOWER(unit))`.
+    - Added composite index `idx_emission_records_user_date_category` for batch lookups.
+[✓] Created CSV Bulk Import Query Engine `database/queries/csv_import.sql`:
+    - Category resolution, exact & fuzzy factor lookups, batch insert and verification.
+[✓] Created Advanced Analytics Engine `database/queries/analytics.sql`:
+    - Daily/weekly/monthly time-series, location breakdown, industry benchmarks, drill-downs, YoY comparison.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 9: AI COPILOT DATA ARCHITECTURE (24–27 OCTOBER 2026) [COMPLETED]
+--------------------------------------------------------------------------------
+OBJECTIVE: Build conversation threads, message persistence, token auditing, and prompt context injection.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Authored Migration `003_phase9_ai_copilot.sql` and `003_phase9_ai_copilot_down.sql`.
+[✓] Created table `ai_conversations` with user scoping, title, and `updated_at` trigger.
+[✓] Created table `ai_messages` with role check ('user', 'assistant', 'system'), token count, and timestamps.
+[✓] Created query library `database/queries/ai.sql`:
+    - `ai-create-conversation`: Start new chat thread.
+    - `ai-list-conversations`: Fetch history sidebar with message counts and timestamps.
+    - `ai-get-conversation-by-id`: Fetch thread metadata with strict ownership check.
+    - `ai-update-conversation-title`: Auto-rename thread based on first prompt.
+    - `ai-delete-conversation`: Cascade deletion of conversation and all its messages.
+    - `ai-insert-message`: Store user query or assistant reply with token metrics.
+    - `ai-get-conversation-messages`: Chronological chat context for Gemini prompt construction.
+    - `ai-get-user-emission-context`: Generates structured snapshot of recent user emissions to inject into Gemini system prompt.
+[✓] Added realistic AI Copilot seed conversations and message exchanges to `database/seed.sql`.
+[✓] Updated master schema in `database/schema.sql` and documentation in `database/README.md`.
+
+--------------------------------------------------------------------------------
+[✓] PHASE 9: AI COPILOT SEARCH & TOKEN RATE-LIMITING (28 OCT – 05 NOV 2026) [COMPLETED]
+--------------------------------------------------------------------------------
+OBJECTIVE: Implement full-text search across message history, GIN indexing, and token consumption
+           aggregation queries for API rate-limiting and burst protection.
+DELIVERABLES & ACHIEVEMENTS:
+[✓] Authored Migration `004_phase9_ai_search_and_tokens.sql` and rollback `004_phase9_ai_search_and_tokens_down.sql`.
+[✓] Full-Text Search GIN Indexes:
+    - Added GIN index `idx_ai_messages_content_tsv` on `to_tsvector('english', content)` for sub-millisecond keyword matching.
+    - Added GIN index `idx_ai_conversations_title_tsv` on `to_tsvector('english', title)`.
+[✓] Token Aggregation & Rate-Limiting Indexes:
+    - Added composite index `idx_ai_messages_tokens_convo_created` on `(conversation_id, created_at, tokens_used)`.
+    - Added lookup index `idx_ai_conversations_user_id` on `(user_id, id)`.
+[✓] Created Full-Text Search Query Engine in `database/queries/ai.sql`:
+    - `ai-search-messages`: Ranked full-text search (`ts_rank`) across all user conversations with highlighted snippets (`ts_headline`).
+    - `ai-search-conversation-messages`: In-thread full-text search within a single conversation.
+    - `ai-search-conversations-by-keyword`: Hybrid search matching thread title and message body.
+[✓] Created Token Consumption & Rate-Limiting Query Engine in `database/queries/ai.sql`:
+    - `ai-get-user-token-usage-today`: Daily token consumption summary (prompt vs completion).
+    - `ai-get-user-token-usage-window`: Sliding time window (hourly) token consumption for burst rate-limiting.
+    - `ai-get-user-token-usage-monthly`: Monthly quota aggregation across billing cycles.
+    - `ai-check-user-rate-limit`: Atomic quota verification comparing current usage to allocated tier limit.
+    - `ai-get-token-breakdown-by-conversation`: Per-conversation token metrics and cost auditing.
+[✓] Expanded development seed dataset (`database/seed.sql`) with conversations and messages covering dates up to 05 Nov 2026.
+[✓] Updated master schema (`database/schema.sql`) and documentation (`database/README.md`).
+
+================================================================================
+3. FUTURE WORK & DATE-WISE ROADMAP CHECKLIST (06 NOV 2026 – 15 MAR 2027)
+================================================================================
+
+--------------------------------------------------------------------------------
+[ ] PHASE 9: AI COPILOT STREAMING & INTEGRATION (06 NOVEMBER – 20 NOVEMBER 2026)
+--------------------------------------------------------------------------------
+TARGET DATE-WISE TASKS:
+[ ] 06 Nov – 20 Nov: Integration & Streaming Support:
+    - Validate latency with Chetan's streaming Node.js SSE / WebSocket endpoints.
+    - Validate multi-turn conversational consistency.
+
+--------------------------------------------------------------------------------
+[ ] PHASE 10: FORECASTING DATA LAYER & HISTORICAL FEEDS (21 NOV – 18 DEC 2026)
+--------------------------------------------------------------------------------
+OBJECTIVE: Implement predictive emissions tables, forecast storage, and structured historical
+           training feeds for Ashank's forecasting engine and Chetan's forecast service.
+TARGET DATE-WISE TASKS:
+[ ] 21 Nov – 30 Nov: Forecasting Schema Design & Migration:
+    - Create migration `005_phase10_forecasting.sql` and `005_phase10_forecasting_down.sql`.
+    - Create table `forecasts` (`id`, `user_id`, `period`, `predicted_co2e`, `confidence_lower`, `confidence_upper`, `model_version`, `task_id`).
+[ ] 01 Dec – 10 Dec: Historical Data Retrieval Queries:
+    - Create `database/queries/forecasts.sql`:
+        * `get_historical_training_series`: Extract clean chronologically ordered monthly emissions.
+        * `insert_forecast_batch`: Store generated future projection points.
+        * `get_latest_user_forecast`: Fetch most recent forecast run for dashboard charts.
+        * `get_forecast_vs_actual`: Comparative query aligning predicted vs actuals.
+[ ] 11 Dec – 18 Dec: Cross-Team Validation:
+    - Ensure actual `emission_records` remain strictly separate from `forecasts`.
+    - Coordinate with Daksh to confirm chart data format (JSON array of {period, actual, predicted}).
+
+--------------------------------------------------------------------------------
+[ ] PHASE 11: REPORTS & PDF EXPORT METADATA (19 DEC 2026 – 16 JAN 2027)
+--------------------------------------------------------------------------------
+OBJECTIVE: Finalize report tracking, PDF file reference management, and custom date-range
+           reporting aggregations.
+TARGET DATE-WISE TASKS:
+[ ] 19 Dec – 31 Dec: Report Schema Refinements:
+    - Create migration `005_phase11_reports_expansion.sql` (if schema changes needed).
+    - Enhance `reports` table: `file_reference`, `report_type`, `period_start`, `period_end`, `status`.
+[ ] 01 Jan – 10 Jan: Reporting Query Library:
+    - Expand `database/queries/reports.sql`:
+        * `get_comprehensive_period_report`: Comprehensive single query returning total CO2e,
+          breakdown by category, highest emitting month, and top 5 activities for PDF generation.
+        * `create_report_record`: Store pending report entry.
+        * `update_report_status`: Mark report COMPLETED with PDF file URI or FAILED with error.
+        * `list_user_reports`: Paginated download history for user.
+[ ] 11 Jan – 16 Jan: PDF Generation Pipeline Testing.
+
+--------------------------------------------------------------------------------
+[ ] PHASE 12: FULL C++ SCHEDULER INTEGRATION & CONCURRENCY (17 JAN – 14 FEB 2027)
+--------------------------------------------------------------------------------
+OBJECTIVE: Optimize `tasks` table for high-throughput concurrent access by Ashank's
+           C++ multi-worker scheduling engine, preventing race conditions.
+TARGET DATE-WISE TASKS:
+[ ] 17 Jan – 25 Jan: Concurrency & Lock Handling:
+    - Update `database/queries/tasks.sql`:
+        * `fetch_next_queued_task`: Implement atomic lock retrieval using
+          `SELECT ... FOR UPDATE SKIP LOCKED` to allow multiple C++ workers to grab tasks
+          without deadlocks or race conditions.
+        * `update_task_state`: Transition task: QUEUED -> RUNNING -> COMPLETED / FAILED / RETRYING.
+        * `record_task_retry`: Increment `retry_count` and log `error_message`.
+[ ] 26 Jan – 05 Feb: Task History & Metrics Indexing:
+    - Composite index `idx_tasks_status_priority_created` on `(status, priority DESC, created_at ASC)`.
+[ ] 06 Feb – 14 Feb: Stress & Load Testing with C++ Workers.
+
+--------------------------------------------------------------------------------
+[ ] PHASE 13: FINAL TESTING, OPTIMIZATION & SUBMISSION (15 FEB – 15 MAR 2027)
+--------------------------------------------------------------------------------
+OBJECTIVE: Perform query tuning with EXPLAIN ANALYZE, database hardening, generate the final
+           Data Dictionary, Visual ERD, and produce final project documentation.
+TARGET DATE-WISE TASKS:
+[ ] 15 Feb – 22 Feb: Comprehensive Query Profiling with `EXPLAIN (ANALYZE, BUFFERS)`.
+[ ] 23 Feb – 02 Mar: Hardening & Data Integrity Testing (injection, constraints, edge cases).
+[ ] 03 Mar – 08 Mar: Final Documentation, High-Resolution Visual ERD & College Submission Package.
+[ ] 09 Mar – 15 Mar: Defense Prep and Final Project Presentation.
+
+================================================================================
+4. CROSS-TEAM CONTRACTS & DEPENDENCY MATRIX
+================================================================================
+
+A. What Bhavya Provides to Chetan (Backend Node.js API):
+   - Strict SQL schemas guaranteeing data types and referential integrity.
+   - Clean, parameterized SQL queries in `database/queries/*.sql` eliminating SQL injection.
+   - Standardized column names matching JSON API payload fields (`co2e`, `quantity`, `unit`, etc.).
+   - Migrations allowing seamless schema upgrades with rollback safety.
+   - AI conversation and message persistence with token tracking.
+
+B. What Bhavya Provides to Daksh (Frontend React.js UI):
+   - Aggregated dashboard queries formatted for immediate chart consumption (monthly time-series,
+     category percentage donut charts, YoY comparative deltas).
+   - Rich development seed data (`seed.sql`) with 10 users and 120+ records so UI charts render
+     vibrant, realistic trends instead of blank empty states.
+   - Conversation history ordering for the AI Copilot chat drawer.
+
+C. What Bhavya Provides to Ashank (C++ Scheduler Engine):
+   - Central state persistence in `tasks` table with lifecycle status tracking.
+   - Safe concurrent task claiming via `SELECT FOR UPDATE SKIP LOCKED` in `tasks.sql`.
+   - Dedicated error and retry count auditing columns.
+
+================================================================================
+5. DATABASE REPOSITORY ARTIFACT MAP & FILE DIRECTORY
+================================================================================
+
+Repository Path: `SKIT-CS-2023-2027-07/database/`
+
+File Name                                         Description & Role
+------------------------------------------------  -------------------------------------------------------------
+database/schema.sql                               Master DDL containing all core tables, constraints & triggers
+database/seed.sql                                 Realistic development seed data (10 users, 40+ factors, 120+ records, AI chats)
+database/README.md                                Complete database architecture and setup documentation
+database/migrations/001_initial_schema.sql        MVP forward migration (users, categories, factors, records, tasks, reports)
+database/migrations/001_initial_schema_down.sql   MVP reverse migration (clean rollback)
+database/migrations/002_phase8_calculator_csv_expansion.sql     Phase 8 factor expansion & fast CSV indexes
+database/migrations/002_phase8_calculator_csv_expansion_down.sql Phase 8 rollback migration
+database/migrations/003_phase9_ai_copilot.sql     Phase 9 AI Copilot conversations & messages schema
+database/migrations/003_phase9_ai_copilot_down.sql Phase 9 AI Copilot rollback migration
+database/migrations/004_phase9_ai_search_and_tokens.sql      Phase 9 full-text search GIN & token rate-limiting indexes
+database/migrations/004_phase9_ai_search_and_tokens_down.sql Phase 9 search & token rollback migration
+database/queries/users.sql                        Auth, registration, profile, and security queries
+database/queries/emissions.sql                    Emission CRUD, unit conversion & factor lookup queries
+database/queries/csv_import.sql                   CSV fuzzy matching, validation, and batch insert queries
+database/queries/dashboard.sql                    Summary KPI metrics, monthly trends & category donut queries
+database/queries/analytics.sql                    Advanced time-series, location, industry, and YoY analytics
+database/queries/ai.sql                           AI conversations, full-text search, token rate-limiting & Gemini context
+database/queries/tasks.sql                        C++ scheduler task lifecycle, locking & status queries
+database/queries/reports.sql                      Report generation metadata and audit queries
+
+================================================================================
+SUMMARY
+================================================================================
+All milestones up to 05 November 2026 (Phases 1 through 8, and Phase 9 AI Copilot
+schema, query engine, full-text search, and token rate-limiting) are 100% completed,
+verified, and documented.
+Future milestones (Phase 9 streaming through Phase 13) are meticulously scheduled date-wise
+with crystal clear technical deliverables ready for execution.
+================================================================================
+

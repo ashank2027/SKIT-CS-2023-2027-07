@@ -283,11 +283,18 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
 );
 
 -- Index: user-scoped conversation history
-CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_updated
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_updated 
     ON ai_conversations (user_id, updated_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_ai_conversations_user
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user 
     ON ai_conversations (user_id);
+
+-- (Phase 9 — 05 Nov 2026: Fast user-to-conversation joins & title search)
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_id 
+    ON ai_conversations (user_id, id);
+
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_title_tsv 
+    ON ai_conversations USING gin (to_tsvector('english', title));
 
 
 -- ============================================================================
@@ -312,11 +319,19 @@ CREATE TABLE IF NOT EXISTS ai_messages (
 );
 
 -- Index: ordered conversation message retrieval
-CREATE INDEX IF NOT EXISTS idx_ai_messages_convo_created
+CREATE INDEX IF NOT EXISTS idx_ai_messages_convo_created 
     ON ai_messages (conversation_id, created_at ASC);
 
-CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation
+CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation 
     ON ai_messages (conversation_id);
+
+-- (Phase 9 — 05 Nov 2026: Full-text search across message content)
+CREATE INDEX IF NOT EXISTS idx_ai_messages_content_tsv 
+    ON ai_messages USING gin (to_tsvector('english', content));
+
+-- (Phase 9 — 05 Nov 2026: Token consumption rate-limiting & window aggregations)
+CREATE INDEX IF NOT EXISTS idx_ai_messages_tokens_convo_created 
+    ON ai_messages (conversation_id, created_at, tokens_used);
 
 
 -- ============================================================================
