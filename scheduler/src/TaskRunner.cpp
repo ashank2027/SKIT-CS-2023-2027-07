@@ -10,6 +10,7 @@
 #include "TaskRunner.h"
 #include "CsvProcessor.h"
 #include "AnalyticsProcessor.h"
+#include "AiAnalysisProcessor.h"
 #include "Metrics.h"
 
 #include <iostream>
@@ -29,7 +30,7 @@ void TaskRunner::printUsage(const char* programName) {
     std::cout << "  " << programName << " [options]\n\n";
     std::cout << "Options:\n";
     std::cout << "  --demo                  Run the interactive multi-scenario demo suite\n";
-    std::cout << "  --type <TYPE>           Task type: CSV_PROCESSING | ANALYTICS (default: CSV_PROCESSING)\n";
+    std::cout << "  --type <TYPE>           Task type: CSV_PROCESSING | ANALYTICS | AI_ANALYSIS (default: CSV_PROCESSING)\n";
     std::cout << "  --input <path>          Path to input file (e.g. data/sample_emissions.csv)\n";
     std::cout << "  --output <path>         Path to write result JSON (optional)\n";
     std::cout << "  --task-id <id>          Task ID from PostgreSQL tasks table (default: 1)\n";
@@ -37,9 +38,11 @@ void TaskRunner::printUsage(const char* programName) {
     std::cout << "  --priority <1-10>       Priority value (higher executes first, default: 5)\n";
     std::cout << "  --policy <P>            Scheduling policy: PRIORITY | ROUND_ROBIN (default: PRIORITY)\n";
     std::cout << "  --workers <count>       Number of worker threads (default: 2)\n";
+    std::cout << "  --simulate-rate-limit   Simulate external AI API rate-limit (HTTP 429) & verify retry\n";
     std::cout << "  --help, -h              Show this help message\n\n";
     std::cout << "Example (Node.js backend execution):\n";
     std::cout << "  " << programName << " --type CSV_PROCESSING --input uploads/emissions.csv --output results/task_42.json\n";
+    std::cout << "  " << programName << " --type AI_ANALYSIS --input data/sample_emissions.csv --output results/ai_task_43.json\n";
     std::cout << "================================================================\n\n";
 }
 
@@ -71,6 +74,8 @@ CliOptions TaskRunner::parseArgs(int argc, char* argv[]) {
             opts.inputPath = argv[++i];
         } else if (arg == "--output" && i + 1 < argc) {
             opts.outputPath = argv[++i];
+        } else if (arg == "--simulate-rate-limit") {
+            opts.simulateRateLimit = true;
         } else if (arg == "--policy" && i + 1 < argc) {
             std::string p = argv[++i];
             if (p == "ROUND_ROBIN" || p == "rr") {
@@ -137,6 +142,15 @@ int TaskRunner::execute(const CliOptions& options) {
         task->setWorkFunction([&]() -> bool {
             AnalyticsProcessor processor;
             auto result = processor.processCsvFile(options.inputPath);
+            resultPayload = result.toJson();
+            isSuccess = result.success;
+            isDone = true;
+            return result.success;
+        });
+    } else if (options.taskType == TaskType::AI_ANALYSIS) {
+        task->setWorkFunction([&]() -> bool {
+            AiAnalysisProcessor processor;
+            auto result = processor.analyzeCsvFile(options.inputPath, options.taskId, options.userId, options.simulateRateLimit);
             resultPayload = result.toJson();
             isSuccess = result.success;
             isDone = true;

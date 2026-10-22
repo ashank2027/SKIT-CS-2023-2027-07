@@ -311,6 +311,10 @@ The scheduler supports **real C++ computational workers** and a **CLI Task Runne
 2. **`ANALYTICS` (`AnalyticsProcessor.h / .cpp`)**:
    - Computes category distributions, monthly timeline trends, top contributors, and averages.
    - Serializes JSON analytics ready for frontend dashboard charts.
+3. **`AI_ANALYSIS` (`AiAnalysisProcessor.h / .cpp`)** *(Phase 9)*:
+   - Performs statistical deviation checks and anomaly detection across emission categories.
+   - Formulates tailored decarbonization recommendations with feasibility, priority, and projected CO2e savings.
+   - Implements external API rate-limit resilience (HTTP 429 quota throttling) with exponential backoff and automatic retry coordination.
 
 ### CLI Task Runner Usage:
 ```powershell
@@ -320,30 +324,65 @@ The scheduler supports **real C++ computational workers** and a **CLI Task Runne
 # Run Analytics computation background task
 .\ecoinsight_scheduler.exe --type ANALYTICS --input data/sample_emissions.csv --output analytics.json --task-id 102 --priority 6
 
-# Run full interactive demonstration suite
+# Run AI background analysis with rate-limit resilience testing
+.\ecoinsight_scheduler.exe --type AI_ANALYSIS --input data/sample_emissions.csv --output ai_result.json --task-id 103 --priority 9 --simulate-rate-limit
+
+# Run full interactive demonstration suite (7 demos)
 .\ecoinsight_scheduler.exe --demo
 ```
 
 ### Node.js Backend Integration Example:
 ```javascript
-// Example in Chetan's backend controller (Node.js child_process):
-const { execFile } = require('child_process');
+// Using the production bridge module (scheduler/scripts/schedulerBridge.js):
+const schedulerBridge = require('./schedulerBridge');
 
-function runSchedulerTask(taskId, inputPath, outputPath) {
-  return new Promise((resolve, reject) => {
-    execFile('./scheduler/build/ecoinsight_scheduler.exe', [
-      '--type', 'CSV_PROCESSING',
-      '--task-id', String(taskId),
-      '--input', inputPath,
-      '--output', outputPath
-    ], (error, stdout) => {
-      if (error) return reject(error);
-      const result = JSON.parse(stdout);
-      resolve(result);
-    });
+async function handleCsvUpload(req, res) {
+  const result = await schedulerBridge.runTask({
+    type: 'CSV_PROCESSING',
+    taskId: req.body.taskId,
+    userId: req.user.id,
+    inputPath: req.file.path,
+    outputPath: `uploads/results/task_${req.body.taskId}.json`,
+    priority: 8
   });
+  res.json(result.data);
 }
 ```
+
+---
+
+## 16. End-to-End Pipeline Verification (14–16 October Milestone)
+
+The integration pipeline has been verified across the full stack:
+
+1. **Automated Verification Suite (`scheduler/scripts/verify_pipeline.js`)**:
+   - Executes 17 end-to-end assertions covering CSV parsing, emission factor multiplication, corrupt input detection, database contract compliance, and CLI argument parsing.
+   - Run verification suite:
+     ```bash
+     node scheduler/scripts/verify_pipeline.js
+     ```
+
+2. **Corrupt CSV Handling & Fault Tolerance**:
+   - Tested against `scheduler/data/sample_invalid.csv` with malformed rows (empty activities, negative quantities, non-numeric values).
+   - Generates structured error outputs matching `tasks.error_message` and `tasks.result_reference` in PostgreSQL.
+
+3. **Database Schema Compliance**:
+   - JSON output fields strictly map to Bhavya's `tasks` table:
+     - `tasks.status`: `QUEUED` → `RUNNING` → `COMPLETED` / `FAILED` / `RETRYING`
+     - `tasks.result_reference`: serialized summary JSON (`valid_rows`, `total_co2e_kg`, `category_breakdown`)
+     - `tasks.error_message`: detailed error description if processing fails
+
+---
+
+## 17. AI Background Processing & Rate-Limit Resilience (Phase 9 — October End)
+
+The C++ Scheduler integrates a dedicated AI Background Worker (`AiAnalysisProcessor`) designed for heavy background analytical jobs triggered by Chetan's `/api/ai` backend and Daksh's AI Copilot UI.
+
+### Key Capabilities:
+- **Anomaly Detection**: Evaluates current emissions against commercial benchmark baselines (`m_industryBaselines`), tagging anomalies with severity levels (`CRITICAL`, `HIGH`, `MEDIUM`).
+- **Actionable Recommendations**: Synthesizes structured decarbonization strategies (Solar PPA, IoT HVAC setback, fleet electrification, zero-waste composting) with quantified abatement projections (kg CO2e) and ROI horizons.
+- **External API Rate-Limit Resilience**: When an external LLM API (e.g. Gemini) returns HTTP 429 Too Many Requests or quota limits, the worker triggers transient failure. The OS Scheduler intercepts this, transitions the task to `TaskStatus::RETRYING`, applies exponential backoff, increments `retry_count`, and safely requeues the task until success or reaching `MAX_RETRIES = 3`.
+- **Database Output Format**: Serializes into `tasks.result_reference` with `executive_summary`, `anomalies[]`, `recommendations[]`, and `execution_time_ms`.
 
 ---
 
@@ -352,27 +391,33 @@ function runSchedulerTask(taskId, inputPath, outputPath) {
 ```
 scheduler/
 ├── include/
-│   ├── Task.h               # Task model (aligned with DB contract)
-│   ├── TaskQueue.h          # Thread-safe task queue
-│   ├── Scheduler.h          # Scheduler engine + policy abstraction
-│   ├── Metrics.h            # Performance metrics tracking
-│   ├── CsvProcessor.h       # CSV parsing, factor lookup & CO2e calculation
-│   ├── AnalyticsProcessor.h # Data aggregation & metrics engine
-│   └── TaskRunner.h         # CLI argument parsing & task runner
+│   ├── Task.h                 # Task model (aligned with DB contract)
+│   ├── TaskQueue.h            # Thread-safe task queue
+│   ├── Scheduler.h            # Scheduler engine + policy abstraction
+│   ├── Metrics.h              # Performance metrics tracking
+│   ├── CsvProcessor.h         # CSV parsing, factor lookup & CO2e calculation
+│   ├── AnalyticsProcessor.h   # Data aggregation & metrics engine
+│   ├── AiAnalysisProcessor.h  # AI background worker & anomaly detection
+│   └── TaskRunner.h           # CLI argument parsing & task runner
 ├── src/
-│   ├── Task.cpp             # Task implementation
-│   ├── TaskQueue.cpp        # Queue implementation (mutex + CV)
-│   ├── Scheduler.cpp        # Priority + Round Robin + retry
-│   ├── Metrics.cpp          # Metrics computation + report
-│   ├── CsvProcessor.cpp     # CSV processing implementation
+│   ├── Task.cpp               # Task implementation
+│   ├── TaskQueue.cpp          # Queue implementation (mutex + CV)
+│   ├── Scheduler.cpp          # Priority + Round Robin + retry
+│   ├── Metrics.cpp            # Metrics computation + report
+│   ├── CsvProcessor.cpp       # CSV processing implementation
 │   ├── AnalyticsProcessor.cpp # Analytics computation implementation
-│   └── TaskRunner.cpp       # CLI runner implementation
+│   ├── AiAnalysisProcessor.cpp# AI background worker implementation
+│   └── TaskRunner.cpp         # CLI runner implementation
 ├── data/
-│   ├── sample_emissions.csv # Valid sample emission dataset
-│   └── sample_invalid.csv   # Malformed rows dataset for error testing
-├── main.cpp                 # Demonstration program (6 demos) & CLI entry point
-├── CMakeLists.txt           # CMake build configuration
-└── README.md                # This file
+│   ├── sample_emissions.csv   # Valid sample emission dataset
+│   ├── sample_invalid.csv     # Malformed rows dataset for error testing
+│   └── sample_ai_input.json   # Sample profile for AI background analysis
+├── scripts/
+│   ├── verify_pipeline.js     # Automated Node.js integration verification suite
+│   └── schedulerBridge.js     # Production Node.js child_process bridge module
+├── main.cpp                   # Demonstration program (7 demos) & CLI entry point
+├── CMakeLists.txt             # CMake build configuration
+└── README.md                  # This file
 ```
 
 ---

@@ -1,0 +1,19 @@
+{
+  "user_id": 101,
+  "period": "2026-Q3",
+  "organization": "EcoInsight Campus Jaipur",
+  "industry": "Education & Research",
+  "category_emissions": {
+    "Electricity": 780.5,
+    "Transportation": 340.2,
+    "Fuel": 210.0,
+    "Natural Gas": 165.8,
+    "Waste": 85.0,
+    "Water": 15.5
+  },
+  "historical_trend": [
+    { "month": "2026-07", "co2e": 480.2 },
+    { "month": "2026-08", "co2e": 520.1 },
+    { "month": "2026-09", "co2e": 596.7 }
+  ]
+}
