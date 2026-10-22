@@ -32,6 +32,7 @@ struct CliOptions {
     int workerCount{2};
     std::string inputPath;
     std::string outputPath;
+    bool simulateRateLimit{false};
 };
 
 class TaskRunner {

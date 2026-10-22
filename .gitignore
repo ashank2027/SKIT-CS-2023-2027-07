@@ -57,3 +57,4 @@ local_notes/
 
 # Project specification text documents
 *.txt
+!CMakeLists.txt
