@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import api from '../services/api'
 import { mockEmissions, mockCategories } from '../data/mockData'
+import { getCategoryScope } from '../utils/constants'
 
 // ── CSV Parsing & Validation Helpers ───────────────────────────────────────
 const REQUIRED_COLUMNS = ['date', 'category', 'activity', 'quantity', 'unit']
@@ -61,7 +62,12 @@ export default function Emissions() {
   const [showModal, setShowModal] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
   const [filterCategory, setFilterCategory] = useState('')
+  const [filterScope, setFilterScope] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [sortField, setSortField] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
   const [toast, setToast] = useState(null)
@@ -269,9 +275,10 @@ export default function Emissions() {
       showToast('No emissions data to export', 'error')
       return
     }
-    const headers = ['Date', 'Category', 'Activity', 'Quantity', 'Unit', 'CO2e (t)', 'Location']
+    const headers = ['Date', 'Scope', 'Category', 'Activity', 'Quantity', 'Unit', 'CO2e (t)', 'Location']
     const rows = filtered.map(e => [
       e.date || '',
+      `"${getCategoryScope(e.category, e.scope).code}"`,
       `"${(e.category || '').replace(/"/g, '""')}"`,
       `"${(e.activity || '').replace(/"/g, '""')}"`,
       e.quantity || 0,
@@ -406,7 +413,13 @@ export default function Emissions() {
   // ── Filter & Sort ───────────────────────────────────────────────────────
   let filtered = emissions.filter(em => {
     if (filterCategory && em.category !== filterCategory) return false
+    if (filterScope) {
+      const scope = getCategoryScope(em.category, em.scope)
+      if (scope.code !== filterScope) return false
+    }
     if (searchTerm && !em.activity.toLowerCase().includes(searchTerm.toLowerCase())) return false
+    if (startDate && em.date < startDate) return false
+    if (endDate && em.date > endDate) return false
     return true
   })
 
@@ -416,6 +429,11 @@ export default function Emissions() {
     if (sortDir === 'asc') return aVal > bVal ? 1 : -1
     return aVal < bVal ? 1 : -1
   })
+
+  // Pagination calculation
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedRecords = filtered.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize)
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -463,36 +481,85 @@ export default function Emissions() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)', flexWrap: 'wrap' }}>
+      {/* Filters Toolbar */}
+      <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           type="text"
           className="form-input"
           placeholder="Search activities..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ maxWidth: 280 }}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          style={{ maxWidth: 220 }}
         />
         <select
           className="form-select"
           value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-          style={{ maxWidth: 200 }}
+          onChange={(e) => { setFilterCategory(e.target.value); setCurrentPage(1); }}
+          style={{ maxWidth: 170 }}
         >
           <option value="">All Categories</option>
           {categories.map(cat => (
             <option key={cat.id} value={cat.name}>{cat.name}</option>
           ))}
         </select>
+        <select
+          className="form-select"
+          value={filterScope}
+          onChange={(e) => { setFilterScope(e.target.value); setCurrentPage(1); }}
+          style={{ maxWidth: 180 }}
+        >
+          <option value="">All Scopes</option>
+          <option value="Scope 1">Scope 1 (Direct)</option>
+          <option value="Scope 2">Scope 2 (Indirect Energy)</option>
+          <option value="Scope 3">Scope 3 (Value Chain)</option>
+        </select>
+
+        {/* Date Range Picker */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-tertiary)', padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-secondary)' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 700, letterSpacing: '0.5px' }}>FROM</span>
+          <input
+            type="date"
+            className="form-input"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+            style={{ maxWidth: 135, padding: '4px 8px', fontSize: '11px', height: '28px' }}
+          />
+          <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 700, letterSpacing: '0.5px' }}>TO</span>
+          <input
+            type="date"
+            className="form-input"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+            style={{ maxWidth: 135, padding: '4px 8px', fontSize: '11px', height: '28px' }}
+          />
+        </div>
+
+        {(filterCategory || filterScope || searchTerm || startDate || endDate) && (
+          <button
+            className="btn btn-sm btn-outline"
+            onClick={() => {
+              setFilterCategory('')
+              setFilterScope('')
+              setSearchTerm('')
+              setStartDate('')
+              setEndDate('')
+              setCurrentPage(1)
+            }}
+            style={{ padding: '6px 10px', fontSize: '11px' }}
+          >
+            ✕ Clear
+          </button>
+        )}
+
         <div style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>
             {filtered.length}
           </span>
-          <span style={{ marginLeft: 4 }}>records</span>
+          <span style={{ marginLeft: 4 }}>records found</span>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table Card */}
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
           {filtered.length === 0 ? (
@@ -506,53 +573,137 @@ export default function Emissions() {
               </div>
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th onClick={() => handleSort('activity')} style={{ cursor: 'pointer' }}>
-                    Activity {sortField === 'activity' && (sortDir === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('category')} style={{ cursor: 'pointer' }}>
-                    Category {sortField === 'category' && (sortDir === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('quantity')} style={{ cursor: 'pointer' }}>
-                    Quantity {sortField === 'quantity' && (sortDir === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th>Unit</th>
-                  <th onClick={() => handleSort('co2e')} style={{ cursor: 'pointer' }}>
-                    CO₂e {sortField === 'co2e' && (sortDir === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th>Location</th>
-                  <th onClick={() => handleSort('date')} style={{ cursor: 'pointer' }}>
-                    Date {sortField === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((em) => (
-                  <tr key={em.id}>
-                    <td style={{ color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>{em.activity}</td>
-                    <td>
-                      <span className="badge badge-info">{em.category}</span>
-                    </td>
-                    <td>{Number(em.quantity).toLocaleString()}</td>
-                    <td>{em.unit}</td>
-                    <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                      {Number(em.co2e).toFixed(2)} t
-                    </td>
-                    <td>{em.location}</td>
-                    <td>{em.date}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-sm btn-outline" onClick={() => openEditModal(em)}>✏</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(em.id)}>🗑</button>
-                      </div>
-                    </td>
+            <>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th onClick={() => handleSort('activity')} style={{ cursor: 'pointer' }}>
+                      Activity {sortField === 'activity' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th>Scope</th>
+                    <th onClick={() => handleSort('category')} style={{ cursor: 'pointer' }}>
+                      Category {sortField === 'category' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th onClick={() => handleSort('quantity')} style={{ cursor: 'pointer' }}>
+                      Quantity {sortField === 'quantity' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th>Unit</th>
+                    <th onClick={() => handleSort('co2e')} style={{ cursor: 'pointer' }}>
+                      CO₂e {sortField === 'co2e' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th>Location</th>
+                    <th onClick={() => handleSort('date')} style={{ cursor: 'pointer' }}>
+                      Date {sortField === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedRecords.map((em) => {
+                    const scope = getCategoryScope(em.category, em.scope)
+                    return (
+                      <tr key={em.id}>
+                        <td style={{ color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>{em.activity}</td>
+                        <td>
+                          <span className={`badge ${scope.badge}`} title={scope.label}>
+                            {scope.code}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="badge badge-info">{em.category}</span>
+                        </td>
+                        <td>{Number(em.quantity).toLocaleString()}</td>
+                        <td>{em.unit}</td>
+                        <td style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                          {Number(em.co2e).toFixed(2)} t
+                        </td>
+                        <td>{em.location}</td>
+                        <td>{em.date}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-sm btn-outline" onClick={() => openEditModal(em)}>✏</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(em.id)}>🗑</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+
+              {/* Pagination Controls */}
+              {filtered.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--space-md) var(--space-lg)',
+                  borderTop: '1px solid var(--border-primary)',
+                  flexWrap: 'wrap',
+                  gap: 'var(--space-md)',
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                    <span>
+                      Showing <strong style={{ color: 'var(--text-primary)' }}>{Math.min((safeCurrentPage - 1) * pageSize + 1, filtered.length)}</strong> to <strong style={{ color: 'var(--text-primary)' }}>{Math.min(safeCurrentPage * pageSize, filtered.length)}</strong> of <strong style={{ color: 'var(--text-primary)' }}>{filtered.length}</strong>
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>Rows:</span>
+                      <select
+                        className="form-select"
+                        value={pageSize}
+                        onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                        style={{ padding: '2px 8px', fontSize: '11px', height: '28px', width: '65px' }}
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={safeCurrentPage === 1}
+                      style={{ padding: '4px 8px', opacity: safeCurrentPage === 1 ? 0.4 : 1, cursor: safeCurrentPage === 1 ? 'not-allowed' : 'pointer' }}
+                    >
+                      ◀ Prev
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => page === 1 || page === totalPages || Math.abs(page - safeCurrentPage) <= 1)
+                      .map((page, idx, arr) => {
+                        const prev = arr[idx - 1]
+                        return (
+                          <span key={page} style={{ display: 'flex', alignItems: 'center' }}>
+                            {prev && page - prev > 1 && <span style={{ padding: '0 4px', color: 'var(--text-tertiary)' }}>…</span>}
+                            <button
+                              className={`btn btn-sm ${safeCurrentPage === page ? 'btn-primary' : 'btn-outline'}`}
+                              onClick={() => setCurrentPage(page)}
+                              style={{ minWidth: 28, height: 28, padding: 0 }}
+                            >
+                              {page}
+                            </button>
+                          </span>
+                        )
+                      })}
+
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={safeCurrentPage === totalPages}
+                      style={{ padding: '4px 8px', opacity: safeCurrentPage === totalPages ? 0.4 : 1, cursor: safeCurrentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                    >
+                      Next ▶
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -576,6 +727,19 @@ export default function Emissions() {
                     ))}
                   </select>
                 </div>
+                {form.category && (
+                  <div className="form-group">
+                    <label className="form-label">GHG Scope Classification</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-secondary)' }}>
+                      <span className={`badge ${getCategoryScope(form.category).badge}`}>
+                        {getCategoryScope(form.category).code}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {getCategoryScope(form.category).label}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="form-label">Activity *</label>
                   <input type="text" name="activity" className="form-input" placeholder="e.g. Electricity consumption" value={form.activity} onChange={handleChange} required />
