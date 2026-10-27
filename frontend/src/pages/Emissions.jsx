@@ -72,6 +72,11 @@ export default function Emissions() {
   const [sortDir, setSortDir] = useState('desc')
   const [toast, setToast] = useState(null)
 
+  // Batch actions state
+  const [selectedIds, setSelectedIds] = useState([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // CSV Import state
   const [showCSVModal, setShowCSVModal] = useState(false)
   const [csvStep, setCsvStep] = useState(1) // 1=select, 2=preview, 3=uploading, 4=result
@@ -175,10 +180,87 @@ export default function Emissions() {
     try {
       await api.deleteEmission(id)
       setEmissions(emissions.filter(em => em.id !== id))
+      setSelectedIds(prev => prev.filter(item => item !== id))
       showToast('Emission record deleted', 'success')
     } catch {
       setEmissions(emissions.filter(em => em.id !== id))
+      setSelectedIds(prev => prev.filter(item => item !== id))
       showToast('Emission record deleted', 'success')
+    }
+  }
+
+  // ── Batch Operations ───────────────────────────────────────────────────
+  const toggleSelectRecord = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    )
+  }
+
+  const toggleSelectPage = () => {
+    const pageIds = paginatedRecords.map(r => r.id)
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.includes(id))
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)))
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])))
+    }
+  }
+
+  const selectAllFiltered = () => {
+    setSelectedIds(filtered.map(r => r.id))
+  }
+
+  const clearSelection = () => {
+    setSelectedIds([])
+  }
+
+  const handleExportSelectedCSV = () => {
+    const selectedRecords = emissions.filter(em => selectedIds.includes(em.id))
+    if (selectedRecords.length === 0) {
+      showToast('No records selected for export', 'error')
+      return
+    }
+    const headers = ['Date', 'Scope', 'Category', 'Activity', 'Quantity', 'Unit', 'CO2e (t)', 'Location']
+    const rows = selectedRecords.map(e => [
+      e.date || '',
+      `"${getCategoryScope(e.category, e.scope).code}"`,
+      `"${(e.category || '').replace(/"/g, '""')}"`,
+      `"${(e.activity || '').replace(/"/g, '""')}"`,
+      e.quantity || 0,
+      e.unit || '',
+      e.co2e || '0.00',
+      `"${(e.location || '').replace(/"/g, '""')}"`
+    ].join(','))
+    const csvContent = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `selected_emissions_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    showToast(`Exported ${selectedRecords.length} selected records to CSV`, 'success')
+  }
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setBulkDeleting(true)
+    const count = selectedIds.length
+    try {
+      await Promise.allSettled(selectedIds.map(id => api.deleteEmission(id)))
+      setEmissions(prev => prev.filter(em => !selectedIds.includes(em.id)))
+      setSelectedIds([])
+      setShowBulkDeleteModal(false)
+      showToast(`Successfully deleted ${count} emission records`, 'success')
+    } catch {
+      setEmissions(prev => prev.filter(em => !selectedIds.includes(em.id)))
+      setSelectedIds([])
+      setShowBulkDeleteModal(false)
+      showToast(`Deleted ${count} emission records`, 'success')
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -559,6 +641,76 @@ export default function Emissions() {
         </div>
       </div>
 
+      {/* Batch Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'linear-gradient(135deg, rgba(0, 229, 160, 0.12), rgba(0, 188, 212, 0.08))',
+          border: '1px solid var(--accent-primary)',
+          borderRadius: 'var(--radius-md)',
+          padding: '10px 18px',
+          marginBottom: 'var(--space-md)',
+          animation: 'fadeIn 0.2s ease-in-out',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: 'var(--accent-primary)',
+              color: '#000',
+              fontWeight: 700,
+              fontSize: 12
+            }}>
+              {selectedIds.length}
+            </span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13 }}>
+              {selectedIds.length} {selectedIds.length === 1 ? 'record' : 'records'} selected
+            </span>
+            {filtered.length > paginatedRecords.length && selectedIds.length !== filtered.length && (
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={selectAllFiltered}
+                style={{ fontSize: 12, color: 'var(--accent-primary)', textDecoration: 'underline', padding: '0 4px', cursor: 'pointer', background: 'none', border: 'none' }}
+              >
+                Select all {filtered.length} matching records
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={handleExportSelectedCSV}
+              title="Export selected records to CSV"
+            >
+              📤 Export Selected ({selectedIds.length})
+            </button>
+            <button
+              className="btn btn-sm btn-danger"
+              onClick={() => setShowBulkDeleteModal(true)}
+              title="Delete selected records"
+            >
+              🗑 Delete Selected ({selectedIds.length})
+            </button>
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={clearSelection}
+              style={{ padding: '6px 12px', fontSize: 11 }}
+            >
+              ✕ Deselect
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table Card */}
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
@@ -577,6 +729,22 @@ export default function Emissions() {
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th style={{ width: 44, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.includes(r.id))}
+                        ref={el => {
+                          if (el) {
+                            const hasSome = paginatedRecords.some(r => selectedIds.includes(r.id))
+                            const hasAll = paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.includes(r.id))
+                            el.indeterminate = hasSome && !hasAll
+                          }
+                        }}
+                        onChange={toggleSelectPage}
+                        style={{ cursor: 'pointer', accentColor: 'var(--accent-primary)', width: 16, height: 16 }}
+                        title="Select/Deselect visible records on this page"
+                      />
+                    </th>
                     <th onClick={() => handleSort('activity')} style={{ cursor: 'pointer' }}>
                       Activity {sortField === 'activity' && (sortDir === 'asc' ? '↑' : '↓')}
                     </th>
@@ -601,8 +769,17 @@ export default function Emissions() {
                 <tbody>
                   {paginatedRecords.map((em) => {
                     const scope = getCategoryScope(em.category, em.scope)
+                    const isSelected = selectedIds.includes(em.id)
                     return (
-                      <tr key={em.id}>
+                      <tr key={em.id} style={{ background: isSelected ? 'rgba(0, 229, 160, 0.07)' : undefined }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectRecord(em.id)}
+                            style={{ cursor: 'pointer', accentColor: 'var(--accent-primary)', width: 16, height: 16 }}
+                          />
+                        </td>
                         <td style={{ color: 'var(--text-primary)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>{em.activity}</td>
                         <td>
                           <span className={`badge ${scope.badge}`} title={scope.label}>
@@ -780,6 +957,44 @@ export default function Emissions() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteModal && (
+        <div className="modal-overlay" onClick={() => !bulkDeleting && setShowBulkDeleteModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ color: 'var(--accent-danger, #ff5252)' }}>⚠️ Confirm Bulk Deletion</h3>
+              <button className="modal-close" onClick={() => !bulkDeleting && setShowBulkDeleteModal(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <p>
+                Are you sure you want to permanently delete <strong style={{ color: 'var(--text-primary)' }}>{selectedIds.length}</strong> selected emission records?
+              </p>
+              <p style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                This action cannot be undone. All linked activity data and calculated CO₂e emissions will be purged.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowBulkDeleteModal(false)}
+                disabled={bulkDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleConfirmBulkDelete}
+                disabled={bulkDeleting}
+              >
+                {bulkDeleting ? 'Deleting...' : `Yes, Delete ${selectedIds.length} Records`}
+              </button>
+            </div>
           </div>
         </div>
       )}
