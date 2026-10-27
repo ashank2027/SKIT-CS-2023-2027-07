@@ -30,6 +30,23 @@ export const SCOPE_COLORS = {
   'Scope 3 (Value Chain)': '#7c4dff',
 }
 
+/** Helper to resolve GHG Scope from category and optional record override */
+export const getCategoryScope = (category, recordScope) => {
+  if (recordScope) {
+    if (recordScope.includes('1')) return { code: 'Scope 1', label: 'Scope 1 (Direct)', badge: 'badge-warning', color: '#ff7043' }
+    if (recordScope.includes('2')) return { code: 'Scope 2', label: 'Scope 2 (Indirect Energy)', badge: 'badge-success', color: '#00e5a0' }
+    return { code: 'Scope 3', label: 'Scope 3 (Value Chain)', badge: 'badge-purple', color: '#7c4dff' }
+  }
+  const c = (category || '').toLowerCase()
+  if (c.includes('fuel') || c.includes('gas') || c.includes('diesel') || c.includes('petrol') || c.includes('combustion')) {
+    return { code: 'Scope 1', label: 'Scope 1 (Direct)', badge: 'badge-warning', color: '#ff7043' }
+  }
+  if (c.includes('electr') || c.includes('power') || c.includes('grid') || c.includes('heat') || c.includes('steam')) {
+    return { code: 'Scope 2', label: 'Scope 2 (Indirect Energy)', badge: 'badge-success', color: '#00e5a0' }
+  }
+  return { code: 'Scope 3', label: 'Scope 3 (Value Chain)', badge: 'badge-purple', color: '#7c4dff' }
+}
+
 /** Task processing statuses */
 export const TASK_STATUS = {
   IDLE: 'IDLE',
