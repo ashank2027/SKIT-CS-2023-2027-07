@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Emissions = lazy(() => import('./pages/Emissions'))
 const Calculator = lazy(() => import('./pages/Calculator'))
 const Analytics = lazy(() => import('./pages/Analytics'))
+const AiCopilot = lazy(() => import('./pages/AiCopilot'))
 const Forecast = lazy(() => import('./pages/Forecast'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Profile = lazy(() => import('./pages/Profile'))
@@ -68,6 +69,7 @@ function App() {
             <Route path="/emissions" element={isAuthenticated ? <Emissions /> : <Navigate to="/login" />} />
             <Route path="/calculator" element={isAuthenticated ? <Calculator /> : <Navigate to="/login" />} />
             <Route path="/analytics" element={isAuthenticated ? <Analytics /> : <Navigate to="/login" />} />
+            <Route path="/ai" element={isAuthenticated ? <AiCopilot /> : <Navigate to="/login" />} />
             <Route path="/forecast" element={isAuthenticated ? <Forecast /> : <Navigate to="/login" />} />
             <Route path="/reports" element={isAuthenticated ? <Reports /> : <Navigate to="/login" />} />
             <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
