@@ -7,6 +7,7 @@ const navItems = [
   { path: '/emissions', label: 'Emissions Hub', icon: '🏭' },
   { path: '/calculator', label: 'Carbon Calculator', icon: '🔢' },
   { path: '/analytics', label: 'Analytics & Insights', icon: '📈' },
+  { path: '/ai', label: 'AI Copilot', icon: '🤖' },
   { path: '/forecast', label: 'Predictive AI & Forecast', icon: '🔮' },
   { path: '/reports', label: 'Reports & Audit', icon: '📋' },
 ]
