@@ -48,11 +48,13 @@ pids
 LOCAL_PROGRESS_README.md
 *.local.md
 *.status.txt
+*Checklist*.txt
+*Roadmap*.txt
+*Status_Report*.txt
+Bhavya_*.txt
 personal_notes/
 local_notes/
 
 # Project specification text documents & exceptions
 *.txt
 !CMakeLists.txt
-!Bhavya_Work_Roadmap_And_Checklist.txt
-!Bhavya_Task_Status_Report.txt

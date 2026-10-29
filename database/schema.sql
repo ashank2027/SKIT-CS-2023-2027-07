@@ -272,14 +272,18 @@ CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status);
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ai_conversations (
-    id              SERIAL PRIMARY KEY,
-    user_id         INTEGER         NOT NULL
-                        REFERENCES users (id)
-                        ON DELETE CASCADE
-                        ON UPDATE CASCADE,
-    title           VARCHAR(255)    NOT NULL DEFAULT 'New Conversation',
-    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    id                      SERIAL PRIMARY KEY,
+    user_id                 INTEGER         NOT NULL
+                                REFERENCES users (id)
+                                ON DELETE CASCADE
+                                ON UPDATE CASCADE,
+    title                   VARCHAR(255)    NOT NULL DEFAULT 'New Conversation',
+    system_prompt_tokens    INTEGER         NOT NULL DEFAULT 0
+                                CHECK (system_prompt_tokens >= 0),
+    context_window_tokens   INTEGER         NOT NULL DEFAULT 0
+                                CHECK (context_window_tokens >= 0),
+    created_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- Index: user-scoped conversation history
@@ -298,9 +302,10 @@ CREATE INDEX IF NOT EXISTS idx_ai_conversations_title_tsv
 
 
 -- ============================================================================
--- 8. AI_MESSAGES (Phase 9 — 24 October 2026)
+-- 8. AI_MESSAGES (Phase 9 — 24 October 2026, Enhanced 20 November 2026)
 -- ============================================================================
 -- Stores individual message turns (user query, Gemini assistant response).
+-- Enhanced for real-time SSE / WebSocket streaming and latency tracking.
 -- Consumed by: POST /api/ai/chat, GET /api/ai/conversations/:id
 -- ============================================================================
 
@@ -315,6 +320,13 @@ CREATE TABLE IF NOT EXISTS ai_messages (
     content         TEXT            NOT NULL,
     tokens_used     INTEGER         DEFAULT 0
                         CHECK (tokens_used >= 0),
+    status          VARCHAR(20)     NOT NULL DEFAULT 'completed'
+                        CHECK (status IN ('streaming', 'completed', 'failed')),
+    latency_ms      INTEGER         DEFAULT NULL
+                        CHECK (latency_ms IS NULL OR latency_ms >= 0),
+    chunk_count     INTEGER         NOT NULL DEFAULT 1
+                        CHECK (chunk_count >= 1),
+    model_version   VARCHAR(50)     NOT NULL DEFAULT 'gemini-1.5-pro',
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
@@ -332,6 +344,18 @@ CREATE INDEX IF NOT EXISTS idx_ai_messages_content_tsv
 -- (Phase 9 — 05 Nov 2026: Token consumption rate-limiting & window aggregations)
 CREATE INDEX IF NOT EXISTS idx_ai_messages_tokens_convo_created 
     ON ai_messages (conversation_id, created_at, tokens_used);
+
+-- (Phase 9 — 20 Nov 2026: Streaming recovery, latency SLA & multi-turn alternation)
+CREATE INDEX IF NOT EXISTS idx_ai_messages_status_created
+    ON ai_messages (status, created_at)
+    WHERE status = 'streaming';
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_latency
+    ON ai_messages (conversation_id, latency_ms)
+    WHERE latency_ms IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_convo_role_created
+    ON ai_messages (conversation_id, role, created_at ASC);
 
 
 -- ============================================================================
