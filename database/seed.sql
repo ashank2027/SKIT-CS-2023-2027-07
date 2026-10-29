@@ -293,99 +293,182 @@ INSERT INTO emission_records (user_id, category_id, activity, quantity, unit, em
 
 
 -- ============================================================================
--- 5. AI COPILOT SEED DATA (Phase 9 — 24 October 2026)
-
+-- 5. AI COPILOT SEED DATA (Phase 9 — 24 October – 20 November 2026)
 -- ============================================================================
 -- Realistic sample AI conversations & message exchanges for testing.
--- Demonstrates user questions and AI sustainability recommendations.
+-- Demonstrates multi-turn user queries, real-time SSE streaming, latency tracking,
+-- and AI sustainability recommendations across multiple dates up to 20 Nov 2026.
 
-INSERT INTO ai_conversations (id, user_id, title, created_at, updated_at) VALUES
-    (1, 1, 'Electricity Emission Reduction Strategy', '2026-10-24 10:15:00+00', '2026-10-24 10:16:30+00'),
-    (2, 1, 'Q3 2026 Carbon Footprint Summary',        '2026-10-25 14:00:00+00', '2026-10-25 14:02:10+00'),
-    (3, 2, 'Fleet Electrification Feasibility',       '2026-10-26 11:30:00+00', '2026-10-26 11:32:45+00'),
-    (4, 1, 'Scope 3 Supply Chain Logistics & Packaging', '2026-11-02 09:30:00+00', '2026-11-02 09:33:15+00'),
-    (5, 3, 'Water Recycling & Effluent Treatment Savings', '2026-11-04 16:15:00+00', '2026-11-04 16:17:20+00')
+INSERT INTO ai_conversations (
+    id,
+    user_id,
+    title,
+    system_prompt_tokens,
+    context_window_tokens,
+    created_at,
+    updated_at
+) VALUES
+    (1, 1, 'Electricity Emission Reduction Strategy',               420, 1280, '2026-10-24 10:15:00+00', '2026-10-24 10:16:30+00'),
+    (2, 1, 'Q3 2026 Carbon Footprint Summary',                      380,  950, '2026-10-25 14:00:00+00', '2026-10-25 14:02:10+00'),
+    (3, 2, 'Fleet Electrification Feasibility',                     450, 1100, '2026-10-26 11:30:00+00', '2026-10-26 11:32:45+00'),
+    (4, 1, 'Scope 3 Supply Chain Logistics & Packaging',            410, 1460, '2026-11-02 09:30:00+00', '2026-11-02 09:33:15+00'),
+    (5, 3, 'Water Recycling & Effluent Treatment Savings',          390,  880, '2026-11-04 16:15:00+00', '2026-11-04 16:17:20+00'),
+    (6, 1, 'HVAC Smart Scheduling & Battery Peak Shaving',          440, 1620, '2026-11-08 11:00:00+00', '2026-11-08 11:04:15+00'),
+    (7, 2, 'DEFRA 2024 Ocean Freight vs Air Cargo Transition',      460, 1840, '2026-11-12 15:20:00+00', '2026-11-12 15:25:30+00'),
+    (8, 4, 'Scope 1 Boiler Decarbonization & Methane Leak Auditing', 430, 1390, '2026-11-16 10:10:00+00', '2026-11-16 10:13:40+00'),
+    (9, 5, 'ISO 14064 Carbon Audit Readiness & Scope 2 Decarb',     490, 2150, '2026-11-20 09:45:00+00', '2026-11-20 09:51:20+00')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO ai_messages (conversation_id, role, content, tokens_used, created_at) VALUES
+INSERT INTO ai_messages (
+    conversation_id,
+    role,
+    content,
+    tokens_used,
+    status,
+    latency_ms,
+    chunk_count,
+    model_version,
+    created_at
+) VALUES
     -- Conversation 1: User 1 (IT Industry, Bengaluru)
     (1, 'user', 
         'Our electricity consumption is our highest emission source in Bengaluru. What are three high-impact strategies to reduce it by 20% by next year?',
-        35, 
-        '2026-10-24 10:15:00+00'),
+        35, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-10-24 10:15:00+00'),
     (1, 'assistant',
         'Based on your data from Bengaluru showing high Grid Electricity usage (factor 0.82 kg CO2e/kWh):
 
 1. **Procure Rooftop Solar or Open Access PPA**: Shifting 30% of your data center and office load to solar reduces operational electricity emissions by up to 93% per kWh (0.05 vs 0.82 kg CO2e/kWh).
 2. **Optimize Server Room HVAC Setpoints**: Increasing IT server room cooling thresholds from 20°C to 24°C compliant with ASHRAE standards cuts air-conditioning power consumption by 12–15%.
 3. **Automated Sleep Policies & Smart Metering**: Deploy automated scheduled sleep states on idle workstations and peripheral equipment during non-business hours (7 PM to 7 AM).',
-        185, 
-        '2026-10-24 10:15:45+00'),
+        185, 'completed', 740, 22, 'gemini-1.5-pro', '2026-10-24 10:15:45+00'),
     (1, 'user',
         'What would be the estimated CO2e savings if we switch 5,000 kWh/month to solar?',
-        22,
-        '2026-10-24 10:16:10+00'),
+        22, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-10-24 10:16:10+00'),
     (1, 'assistant',
         'Switching 5,000 kWh/month from India Grid Electricity (0.82 kg CO2e/kWh) to Solar (0.05 kg CO2e/kWh) saves **3.85 tonnes of CO2e per month** (approx. **46.2 tonnes CO2e annually**), a net 93.9% emission reduction for that energy block.',
-        78,
-        '2026-10-24 10:16:30+00'),
+        78, 'completed', 490, 14, 'gemini-1.5-flash', '2026-10-24 10:16:30+00'),
 
     -- Conversation 2: User 1
     (2, 'user',
         'Can you summarize my top emission category and month-over-month trend for Q3 2026?',
-        24,
-        '2026-10-25 14:00:00+00'),
+        24, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-10-25 14:00:00+00'),
     (2, 'assistant',
         'Here is your Q3 2026 analysis:
 - **Top Emission Source**: Grid Electricity accounted for **78.4%** of your total emissions across July–September.
 - **Trend**: Your emissions peaked in July (5,740 kg CO2e) and declined by **11.2% in August** (5,096 kg CO2e) following reduced office occupancy and cooling adjustments.',
-        110,
-        '2026-10-25 14:02:10+00'),
+        110, 'completed', 620, 18, 'gemini-1.5-pro', '2026-10-25 14:02:10+00'),
 
     -- Conversation 3: User 2 (Manufacturing, Pune)
     (3, 'user',
         'How much CO2e would our manufacturing plant save by transitioning our diesel delivery vans to commercial EVs?',
-        25,
-        '2026-10-26 11:30:00+00'),
+        25, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-10-26 11:30:00+00'),
     (3, 'assistant',
         'For commercial fleet operations:
 - **Diesel Van**: Emits approximately **0.171 kg CO2e/km**.
 - **Electric Vehicle (BEV on Grid)**: Emits approximately **0.053 kg CO2e/km** (or near zero with renewable charging).
 - **Net Saving**: You will save **0.118 kg CO2e per kilometer**, achieving an immediate **69% operational footprint reduction** across all delivery routes.',
-        125,
-        '2026-10-26 11:32:45+00'),
+        125, 'completed', 810, 24, 'gemini-1.5-pro', '2026-10-26 11:32:45+00'),
 
     -- Conversation 4: User 1 (02 Nov 2026 — Supply Chain & Packaging Search Targets)
     (4, 'user',
         'We want to evaluate low-carbon alternatives for our domestic freight logistics and cardboard packaging waste.',
-        21,
-        '2026-11-02 09:30:00+00'),
+        21, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-02 09:30:00+00'),
     (4, 'assistant',
         'Key levers for Scope 3 freight and waste decarbonization:
 1. **Modal Shift to Rail**: Shifting long-haul freight from Heavy Diesel Trucks (0.892 kg CO2e/km) to Electric Freight Rail (0.041 kg CO2e/km) eliminates 95% of transit emissions.
 2. **Closed-Loop Recycled Packaging**: Recycling corrugated cardboard emits only 0.021 kg CO2e/kg compared to 0.587 kg CO2e/kg for landfill disposal, yielding a 96.4% lifecycle footprint reduction.',
-        142,
-        '2026-11-02 09:31:40+00'),
+        142, 'completed', 690, 21, 'gemini-1.5-pro', '2026-11-02 09:31:40+00'),
     (4, 'user',
         'Can you calculate the carbon credit offset potential if we recycle 10 tonnes of cardboard per quarter?',
-        20,
-        '2026-11-02 09:32:30+00'),
+        20, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-02 09:32:30+00'),
     (4, 'assistant',
         'Recycling 10 tonnes (10,000 kg) of cardboard avoids 5.66 tonnes of CO2e per quarter (22.64 tonnes CO2e annually) versus landfill methane generation.',
-        65,
-        '2026-11-02 09:33:15+00'),
+        65, 'completed', 410, 11, 'gemini-1.5-flash', '2026-11-02 09:33:15+00'),
 
     -- Conversation 5: User 3 (04 Nov 2026 — Textile & Water Conservation)
     (5, 'user',
         'How does on-site industrial wastewater treatment compare against municipal discharge in terms of GHG footprint?',
-        19,
-        '2026-11-04 16:15:00+00'),
+        19, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-04 16:15:00+00'),
     (5, 'assistant',
         'Wastewater treatment emissions analysis:
 - **Standard Wastewater Treatment**: Factors indicate 0.708 kg CO2e/kl treated.
 - **Bioreactor with Methane Capture**: Capturing bio-gas reduces net lifecycle emissions to approximately 0.280 kg CO2e/kl, while generating reusable heat energy for factory boilers.',
-        118,
-        '2026-11-04 16:17:20+00');
+        118, 'completed', 560, 16, 'gemini-1.5-flash', '2026-11-04 16:17:20+00'),
+
+    -- Conversation 6: User 1 (08 Nov 2026 — Multi-Turn HVAC & Battery Peak Shaving)
+    (6, 'user',
+        'Can we combine smart HVAC cycling with battery energy storage (BESS) to lower our peak demand charges and grid carbon intensity in Bengaluru?',
+        27, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-08 11:00:00+00'),
+    (6, 'assistant',
+        'Yes, co-locating Battery Energy Storage Systems (BESS) with automated HVAC cycling offers substantial dual benefits:
+1. **Carbon Arbitrage**: Charge batteries during peak solar hours (11 AM – 3 PM) when grid intensity is lower, and discharge during evening peak hours (6 PM – 10 PM) when Karnataka grid draws heavily from coal thermal stations.
+2. **Demand Peak Shaving**: Pre-cooling facility spaces by 1.5°C before 5 PM suppresses peak chiller demand by up to 25%, avoiding tariff penalties while reducing high-intensity peak grid emissions.',
+        156, 'completed', 680, 23, 'gemini-1.5-pro', '2026-11-08 11:01:25+00'),
+    (6, 'user',
+        'What would be the estimated payback period for a 100 kWh lithium iron phosphate (LFP) battery installation?',
+        21, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-08 11:02:10+00'),
+    (6, 'assistant',
+        'For commercial commercial tariffs in Bengaluru (BESCOM HT-2a):
+- **Capex**: Approximately ₹28,000 to ₹34,000 per kWh for commercial LFP systems (~₹30 Lakhs total).
+- **Annual Savings**: Demand charge reduction + Time-of-Day (ToD) tariff arbitrage typically saves ₹6.8–₹8.2 Lakhs annually.
+- **Payback Period**: **3.7 to 4.4 years**, with an asset lifetime of 10+ years (4,000–6,000 cycles).',
+        138, 'completed', 520, 19, 'gemini-1.5-flash', '2026-11-08 11:04:15+00'),
+
+    -- Conversation 7: User 2 (12 Nov 2026 — DEFRA 2024 Ocean Freight vs Air Cargo)
+    (7, 'user',
+        'Our export division currently air-freights 15 tonnes of precision components monthly from Mumbai to Frankfurt. What is the emission reduction if we shift to sea container freight?',
+        31, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-12 15:20:00+00'),
+    (7, 'assistant',
+        'According to UK DEFRA 2024 and IMO emission factors:
+- **Air Freight (Long-haul international)**: ~0.602 kg CO2e per tonne-km. For Mumbai to Frankfurt (~6,600 km), 15 tonnes produces **59.6 tonnes CO2e** per single shipment.
+- **Ocean Container Ship**: ~0.016 kg CO2e per tonne-km. For maritime routing via Suez (~7,800 nautical km), 15 tonnes produces only **1.87 tonnes CO2e**.
+- **Net Reduction**: Shifting to ocean freight reduces transit emissions by **96.8% (57.7 tonnes CO2e avoided monthly / 692 tonnes CO2e saved annually)**.',
+        174, 'completed', 890, 26, 'gemini-1.5-pro', '2026-11-12 15:22:15+00'),
+    (7, 'user',
+        'How does lead time buffer inventory affect working capital carbon impact?',
+        14, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-12 15:23:45+00'),
+    (7, 'assistant',
+        'While maritime shipping extends lead times from 3 days to 24 days requiring higher safety inventory in European warehouses, warehouse storage emissions (0.008 kg CO2e/pallet-day) represent less than 0.4% of the carbon savings achieved by eliminating air cargo.',
+        88, 'completed', 450, 15, 'gemini-1.5-flash', '2026-11-12 15:25:30+00'),
+
+    -- Conversation 8: User 4 (16 Nov 2026 — Boiler Decarbonization & Methane Leak Auditing)
+    (8, 'user',
+        'We operate dual-fuel natural gas and diesel boilers in our chemical processing plant. How can we audit fugitive emissions and prioritize fuel switching?',
+        26, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-16 10:10:00+00'),
+    (8, 'assistant',
+        'Recommended industrial boiler decarbonization pathway:
+1. **Optical Gas Imaging (OGI) & Ultrasonic Leak Auditing**: Natural gas pipeline joints and pressure relief valves often release uncombusted methane (GWP 28x over 100 years). Fixing valve leaks typically captures 2–5% of lost fuel value immediately.
+2. **Phase out Heavy Diesel for Natural Gas**: Natural Gas combustion factor (2.02 kg CO2e/m3) produces ~28% less carbon per gigajoule than Diesel (2.68 kg CO2e/litre) with near-zero particulate matter and SOx.
+3. **Flue Gas Heat Recovery (Economizers)**: Pre-heating boiler feedwater using flue gas exhaust temperature lifts thermal efficiency by 6–8%, cutting fuel volume proportionally.',
+        192, 'completed', 780, 25, 'gemini-1.5-pro', '2026-11-16 10:12:05+00'),
+    (8, 'user',
+        'What is the feasibility of blending 15% green hydrogen into our existing natural gas burner infrastructure?',
+        19, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-16 10:12:45+00'),
+    (8, 'assistant',
+        'Most modern industrial low-NOx gas burners accept up to 15–20% hydrogen by volume without burner head modification or pipe embrittlement risks. A 15% H2 volumetric blend delivers approximately 5–6% carbon emissions reduction due to hydrogen lower volumetric energy density compared to methane.',
+        96, 'completed', 480, 16, 'gemini-1.5-flash', '2026-11-16 10:13:40+00'),
+
+    -- Conversation 9: User 5 (19–20 Nov 2026 — ISO 14064 Carbon Audit Readiness & Scope 2 Decarb)
+    (9, 'user',
+        'Our leadership team requires an ISO 14064-1 compliant carbon audit report before December 2026. What specific data verification protocols are required for our Scope 1 and Scope 2 boundary?',
+        31, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-19 16:30:00+00'),
+    (9, 'assistant',
+        'To ensure ISO 14064-1 and GHG Protocol Corporate Standard audit compliance:
+1. **Organizational Boundary Protocol**: Select and document either the **Operational Control** or **Equity Share** approach consistently across all subsidiaries and facilities.
+2. **Scope 1 Fuel & Refrigerant Activity Evidence**: Reconcile bulk fuel purchase receipts, monthly utility meter logs, and HVAC F-gas service records. Calculate fugitive refrigerant loss using mass-balance recharge quantities.
+3. **Dual Scope 2 Reporting**: Calculate and publish both **Location-Based** (national/regional grid emission factor: 0.82 kg CO2e/kWh) and **Market-Based** (contractual Energy Attribute Certificates, I-RECs, and green tariff PPAs) metrics.
+4. **Uncertainty & Data Quality Scoring**: Document emission factor source pedigree (e.g., DEFRA 2024, CEA India 2024, IPCC AR6) and quantify activity data variance.',
+        224, 'completed', 940, 29, 'gemini-1.5-pro', '2026-11-19 16:33:10+00'),
+    (9, 'user',
+        'Can EcoInsight export our historical monthly emission totals and factor references directly into audit-ready tabular format?',
+        19, 'completed', NULL, 1, 'gemini-1.5-pro', '2026-11-20 09:48:30+00'),
+    (9, 'assistant',
+        'Yes. EcoInsight database provides audit-ready query endpoints (`/api/analytics/export` and `/api/reports`) that generate timestamped records with full traceability:
+- Raw activity quantity and normalized SI units
+- Source factor citation (e.g., CEA CO2 Baseline v19, UK DEFRA 2024)
+- Exact mathematical calculation formula (`co2e = quantity * factor`)
+- Cryptographic hash audit timestamp and user modification logs.',
+        122, 'completed', 410, 18, 'gemini-1.5-flash', '2026-11-20 09:51:20+00');
 
 -- Reset sequences so subsequent insertions do not conflict
 SELECT setval('ai_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_conversations));
@@ -396,16 +479,17 @@ COMMIT;
 
 
 -- ============================================================================
--- SEED DATA STATISTICS
+-- SEED DATA STATISTICS (Updated 20 November 2026 — Milestone Complete)
 -- ============================================================================
 -- Users:              10
 -- Emission Categories: 6
 -- Emission Factors:   18 (Base) / 40+ (Phase 8 Migration)
 -- Emission Records:  123
--- AI Conversations:   5 (Phase 9 — to 05 Nov 2026)
--- AI Messages:       13 (Phase 9 — to 05 Nov 2026)
+-- AI Conversations:   9 (Phase 9 — covering 24 Oct – 20 Nov 2026)
+-- AI Messages:       22 (Phase 9 — covering 24 Oct – 20 Nov 2026)
+-- Streaming Metadata: status, latency_ms, chunk_count, model_version
 --
--- Date range: March 2026 — November 2026
+-- Date range: March 2026 — 20 November 2026
 -- Locations:  10 Indian cities
 -- Industries: IT, Manufacturing, Energy, Finance, Transportation,
 --             Healthcare, Retail, Education, Agriculture, Construction

@@ -2,7 +2,7 @@
 
 This directory contains the PostgreSQL database architecture for **EcoInsight (SKIT-CS-2023-2027-07)**, owned by **Bhavya Chautharamani**.
 
-This implementation supports the MVP phase (26 September 2026), **Phase 8: Calculator + CSV + Advanced Analytics** (08 October 2026), and **Phase 9: AI Copilot Architecture, Full-Text Search & Token Rate-Limiting** (24 October – 05 November 2026).
+This implementation supports the MVP phase (26 September 2026), **Phase 8: Calculator + CSV + Advanced Analytics** (08 October 2026), and **Phase 9: AI Copilot Architecture, Full-Text Search, Token Rate-Limiting & Real-Time Streaming** (24 October – 20 November 2026).
 
 ## Structure
 
@@ -18,16 +18,20 @@ database/
 │   ├── 003_phase9_ai_copilot.sql       # Phase 9 AI conversations & messages schema
 │   ├── 003_phase9_ai_copilot_down.sql  # Phase 9 rollback migration
 │   ├── 004_phase9_ai_search_and_tokens.sql      # Phase 9 full-text search GIN & token indexes
-│   └── 004_phase9_ai_search_and_tokens_down.sql # Phase 9 rollback migration
+│   ├── 004_phase9_ai_search_and_tokens_down.sql # Phase 9 search & token rollback migration
+│   ├── 005_phase9_ai_streaming_integration.sql      # Phase 9 real-time streaming, latency & SLA indexes
+│   └── 005_phase9_ai_streaming_integration_down.sql # Phase 9 streaming rollback migration
 ├── queries/
 │   ├── users.sql                      # User auth and profile queries
 │   ├── emissions.sql                  # Emission CRUD and factor lookups
 │   ├── csv_import.sql                 # Bulk CSV validation, lookup, and batch insert queries
 │   ├── dashboard.sql                  # Aggregation queries for the dashboard
 │   ├── analytics.sql                  # Time-series, location, industry, and YoY analytics
-│   ├── ai.sql                         # AI Copilot conversations, full-text search, and token rate-limiting
+│   ├── ai.sql                         # AI Copilot conversations, full-text search, token rate-limiting & streaming
 │   ├── tasks.sql                      # Background task metadata (C++ Scheduler)
 │   └── reports.sql                    # Report generation metadata
+├── tests/
+│   └── test_phase9_streaming_integration.sql # Phase 9 automated verification & latency SLA test suite
 └── README.md                          # This documentation
 ```
 
@@ -39,8 +43,8 @@ database/
 4. `emission_records`: Core user emission logs.
 5. `tasks`: Background compute jobs queued for the C++ scheduling engine.
 6. `reports`: Generated PDF report metadata.
-7. `ai_conversations`: User chat sessions with the AI Copilot.
-8. `ai_messages`: Sequential conversational messages (user, assistant, system) with token counts.
+7. `ai_conversations`: User chat sessions with the AI Copilot (includes cached system prompt & context window tokens).
+8. `ai_messages`: Sequential conversational messages with role, tokens, streaming status, latency, chunks, and model version.
 
 ## Setup & Migration Instructions
 
@@ -62,8 +66,14 @@ psql -U postgres -d ecoinsight -f migrations/003_phase9_ai_copilot.sql
 # 5. Run Phase 9 Search & Rate-Limiting migration (GIN full-text search & token indexes)
 psql -U postgres -d ecoinsight -f migrations/004_phase9_ai_search_and_tokens.sql
 
-# 6. Insert development seed data
+# 6. Run Phase 9 Streaming & Multi-Turn Integration migration (real-time SSE streaming & latency SLA)
+psql -U postgres -d ecoinsight -f migrations/005_phase9_ai_streaming_integration.sql
+
+# 7. Insert development seed data
 psql -U postgres -d ecoinsight -f seed.sql
+
+# 8. Run verification test suite
+psql -U postgres -d ecoinsight -f tests/test_phase9_streaming_integration.sql
 ```
 
 ## Seed & Expanded Factor Dataset Summary
@@ -73,12 +83,15 @@ The database layer provides comprehensive datasets for development and testing:
 - **6 categories** & **40+ emission factors** (EPA WARM v15, UK DEFRA 2024, IPCC AR6, CEA India CO2 Baseline 2024)
 - **120+ emission records** covering a multi-month date range, producing realistic charts for analytics.
 - **CSV & Calculator Query Engine** in `queries/csv_import.sql` and `queries/emissions.sql` with case-insensitive fast activity & unit lookups.
-- **AI Copilot Threads** in `queries/ai.sql` and `seed.sql` with realistic user questions and structured sustainability advice.
+- **AI Copilot Threads** in `queries/ai.sql` and `seed.sql` with realistic user questions and structured sustainability advice spanning up to 20 November 2026.
 - **Full-Text Search Engine** in `queries/ai.sql` with English dictionary GIN indexes, `ts_rank` relevance scoring, and highlighted snippet generation (`ts_headline`).
 - **Token Rate-Limiting & Quota Auditing** in `queries/ai.sql` with atomic daily/monthly/window aggregations for API protection.
+- **Real-Time Streaming Lifecycle** in `queries/ai.sql` supporting in-flight message initialization, incremental chunk append, finalization, error recovery, and abandoned session cleanup.
+- **Sliding-Window Multi-Turn Context Pruning** in `queries/ai.sql` maintaining token budgets without overflowing Gemini context limits.
+- **Streaming Latency SLA Metrics** in `queries/ai.sql` calculating p50, p95, and p99 response times and throughput benchmarks.
 - **Automated Gemini Context Builder** in `queries/ai.sql` summarizing 30-day emissions and top emitting categories for prompt context injection.
 
 ## Backend Integration
 
-Node.js (Chetan) connects to this database via `pg`. All queries in `queries/` enforce strict `user_id` scoping for data isolation.
+Node.js (Chetan) connects to this database via `pg`. All queries in `queries/` enforce strict `user_id` scoping for data isolation. Real-time streaming endpoints connect directly to the streaming query engine (`ai-init-streaming-message`, `ai-append-streaming-chunk`, `ai-finalize-streaming-message`).
 
