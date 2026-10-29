@@ -97,16 +97,36 @@ RETURNING id;
 
 
 -- ---------------------------------------------------------
+-- ---------------------------------------------------------
 -- 6. INSERT AI MESSAGE (User Query or Assistant Response)
 -- ---------------------------------------------------------
 -- Used by: POST /api/ai/chat
 -- Parameters: $1 = conversation_id, $2 = role ('user', 'assistant', 'system'),
---             $3 = content, $4 = tokens_used
+--             $3 = content, $4 = tokens_used, $5 = status ('completed', 'streaming', 'failed'),
+--             $6 = latency_ms, $7 = chunk_count, $8 = model_version
 
 -- name: ai-insert-message
-INSERT INTO ai_messages (conversation_id, role, content, tokens_used)
-VALUES ($1, $2, $3, COALESCE($4, 0))
-RETURNING id, conversation_id, role, content, tokens_used, created_at;
+INSERT INTO ai_messages (
+    conversation_id,
+    role,
+    content,
+    tokens_used,
+    status,
+    latency_ms,
+    chunk_count,
+    model_version
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    COALESCE($4, 0),
+    COALESCE($5, 'completed'),
+    $6,
+    COALESCE($7, 1),
+    COALESCE($8, 'gemini-1.5-pro')
+)
+RETURNING id, conversation_id, role, content, tokens_used, status, latency_ms, chunk_count, model_version, created_at;
 
 
 -- ---------------------------------------------------------
@@ -135,6 +155,10 @@ SELECT
     m.role,
     m.content,
     m.tokens_used,
+    m.status,
+    m.latency_ms,
+    m.chunk_count,
+    m.model_version,
     m.created_at
 FROM ai_messages m
 JOIN ai_conversations c ON m.conversation_id = c.id
@@ -417,6 +441,7 @@ FROM today_usage tu;
 
 
 -- ---------------------------------------------------------
+-- ---------------------------------------------------------
 -- 17. TOKEN USAGE BREAKDOWN BY CONVERSATION
 -- ---------------------------------------------------------
 -- Used by: GET /api/ai/usage/conversations (Token Audit Table)
@@ -439,4 +464,322 @@ WHERE c.user_id = $1
 GROUP BY c.id, c.title, c.created_at, c.updated_at
 ORDER BY total_tokens DESC, c.updated_at DESC
 LIMIT COALESCE($2, 20) OFFSET COALESCE($3, 0);
+
+
+-- ============================================================================
+-- STREAMING & MULTI-TURN INTEGRATION ENGINE (Phase 9 — 06 Nov – 20 Nov 2026)
+-- ============================================================================
+
+-- ---------------------------------------------------------
+-- 18. INITIALIZE IN-FLIGHT STREAMING MESSAGE
+-- ---------------------------------------------------------
+-- Used by: POST /api/ai/chat/stream (SSE / WebSocket connection opened)
+-- Creates initial assistant message in 'streaming' state.
+-- Parameters: $1 = conversation_id, $2 = model_version (default 'gemini-1.5-pro')
+
+-- name: ai-init-streaming-message
+INSERT INTO ai_messages (
+    conversation_id,
+    role,
+    content,
+    tokens_used,
+    status,
+    latency_ms,
+    chunk_count,
+    model_version
+)
+VALUES (
+    $1,
+    'assistant',
+    '',
+    0,
+    'streaming',
+    NULL,
+    0,
+    COALESCE($2, 'gemini-1.5-pro')
+)
+RETURNING id, conversation_id, role, status, model_version, created_at;
+
+
+-- ---------------------------------------------------------
+-- 19. APPEND STREAMING CHUNK
+-- ---------------------------------------------------------
+-- Used by: Streaming handler as SSE chunks arrive from Gemini API
+-- Concurrently appends content chunk and increments chunk counter.
+-- Parameters: $1 = message_id, $2 = chunk_text
+
+-- name: ai-append-streaming-chunk
+UPDATE ai_messages
+SET content = content || $2,
+    chunk_count = chunk_count + 1
+WHERE id = $1 AND status = 'streaming'
+RETURNING id, conversation_id, chunk_count, LENGTH(content) AS current_length;
+
+
+-- ---------------------------------------------------------
+-- 20. FINALIZE STREAMING MESSAGE
+-- ---------------------------------------------------------
+-- Used by: Streaming handler on stream completion ('data: [DONE]')
+-- Atomically commits finalized text, token count, generation latency,
+-- sets status to 'completed', and updates conversation updated_at.
+-- Parameters: $1 = message_id, $2 = finalized_content, $3 = tokens_used,
+--             $4 = latency_ms, $5 = final_chunk_count
+
+-- name: ai-finalize-streaming-message
+WITH updated_msg AS (
+    UPDATE ai_messages
+    SET content = $2,
+        tokens_used = $3,
+        latency_ms = $4,
+        chunk_count = COALESCE($5, chunk_count),
+        status = 'completed'
+    WHERE id = $1
+    RETURNING id, conversation_id, role, content, tokens_used, status, latency_ms, chunk_count, model_version, created_at
+),
+touch_convo AS (
+    UPDATE ai_conversations c
+    SET updated_at = NOW()
+    FROM updated_msg um
+    WHERE c.id = um.conversation_id
+)
+SELECT * FROM updated_msg;
+
+
+-- ---------------------------------------------------------
+-- 21. FAIL STREAMING MESSAGE
+-- ---------------------------------------------------------
+-- Used by: Error handler when streaming drops, client disconnects, or upstream errors occur.
+-- Parameters: $1 = message_id, $2 = latency_ms, $3 = error_reason
+
+-- name: ai-fail-streaming-message
+UPDATE ai_messages
+SET status = 'failed',
+    latency_ms = COALESCE($2, latency_ms),
+    content = CASE 
+        WHEN content = '' THEN '[Streaming Failed: ' || COALESCE($3, 'Connection Interrupted') || ']'
+        ELSE content || ' [Stream Terminated: ' || COALESCE($3, 'Incomplete Response') || ']'
+    END
+WHERE id = $1
+RETURNING id, conversation_id, status, latency_ms, content;
+
+
+-- ---------------------------------------------------------
+-- 22. CLEANUP STALE / ORPHANED STREAMING SESSIONS
+-- ---------------------------------------------------------
+-- Used by: Background health worker to clean up abandoned streaming messages
+-- Parameters: $1 = timeout_minutes (e.g. 10)
+
+-- name: ai-cleanup-stale-streams
+UPDATE ai_messages
+SET status = 'failed',
+    content = CASE 
+        WHEN content = '' THEN '[Stream Timed Out: Incomplete Generation]' 
+        ELSE content || ' [Stream Timed Out: Session Expired]' 
+    END
+WHERE status = 'streaming'
+  AND created_at < (NOW() - ($1 || ' minutes')::INTERVAL)
+RETURNING id, conversation_id, status, created_at;
+
+
+-- ---------------------------------------------------------
+-- 23. GET SLIDING CONTEXT WINDOW (Token-Budgeted Multi-Turn Context)
+-- ---------------------------------------------------------
+-- Used by: Backend Gemini prompt assembler before sending chat turns
+-- Dynamically walks back message history and selects the most recent turns
+-- that cumulatively fit within the specified token budget (e.g. 4000 tokens).
+-- Returns messages chronologically ascending (oldest to newest in window).
+-- Parameters: $1 = conversation_id, $2 = user_id, $3 = token_budget (default 4000)
+
+-- name: ai-get-sliding-context-window
+WITH ranked_messages AS (
+    SELECT
+        m.id,
+        m.conversation_id,
+        m.role,
+        m.content,
+        m.tokens_used,
+        m.status,
+        m.latency_ms,
+        m.chunk_count,
+        m.model_version,
+        m.created_at,
+        SUM(m.tokens_used) OVER (
+            PARTITION BY m.conversation_id
+            ORDER BY m.created_at DESC
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS cumulative_tokens_from_latest
+    FROM ai_messages m
+    JOIN ai_conversations c ON m.conversation_id = c.id
+    WHERE m.conversation_id = $1
+      AND c.user_id = $2
+      AND m.status = 'completed'
+)
+SELECT
+    id,
+    conversation_id,
+    role,
+    content,
+    tokens_used,
+    status,
+    latency_ms,
+    chunk_count,
+    model_version,
+    created_at,
+    cumulative_tokens_from_latest AS cumulative_tokens_used
+FROM ranked_messages
+WHERE cumulative_tokens_from_latest <= COALESCE($3, 4000)
+ORDER BY created_at ASC;
+
+
+-- ---------------------------------------------------------
+-- 24. VERIFY CONVERSATION INTEGRITY & TURN CONSISTENCY
+-- ---------------------------------------------------------
+-- Used by: Multi-turn consistency audits and test suites
+-- Analyzes alternating turn integrity (User -> Assistant), checks for
+-- stalled streams, duplicate turns, and computes conversational metrics.
+-- Parameters: $1 = conversation_id, $2 = user_id
+
+-- name: ai-verify-conversation-integrity
+WITH convo_messages AS (
+    SELECT
+        m.id,
+        m.role,
+        m.status,
+        m.tokens_used,
+        m.created_at,
+        LAG(m.role) OVER (ORDER BY m.created_at ASC) AS prev_role,
+        LAG(m.status) OVER (ORDER BY m.created_at ASC) AS prev_status
+    FROM ai_messages m
+    JOIN ai_conversations c ON m.conversation_id = c.id
+    WHERE m.conversation_id = $1 AND c.user_id = $2
+),
+metrics AS (
+    SELECT
+        COUNT(*)                                                    AS total_turns,
+        COUNT(CASE WHEN role = 'user' THEN 1 END)                   AS user_turns,
+        COUNT(CASE WHEN role = 'assistant' THEN 1 END)              AS assistant_turns,
+        COUNT(CASE WHEN role = 'system' THEN 1 END)                 AS system_turns,
+        COUNT(CASE WHEN status = 'streaming' THEN 1 END)            AS active_streaming_count,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END)               AS failed_turns_count,
+        COUNT(CASE WHEN role = prev_role THEN 1 END)                AS consecutive_role_anomalies,
+        COALESCE(SUM(tokens_used), 0)                               AS total_conversation_tokens,
+        ROUND(COALESCE(AVG(tokens_used), 0)::NUMERIC, 1)            AS avg_tokens_per_turn
+    FROM convo_messages
+)
+SELECT
+    $1                                                              AS conversation_id,
+    $2                                                              AS user_id,
+    m.total_turns,
+    m.user_turns,
+    m.assistant_turns,
+    m.system_turns,
+    m.active_streaming_count,
+    m.failed_turns_count,
+    m.consecutive_role_anomalies,
+    m.total_conversation_tokens,
+    m.avg_tokens_per_turn,
+    CASE
+        WHEN m.total_turns = 0 THEN 'EMPTY_CONVERSATION'
+        WHEN m.active_streaming_count > 0 THEN 'STREAMING_IN_PROGRESS'
+        WHEN m.consecutive_role_anomalies > 0 THEN 'ROLE_SEQUENCE_ANOMALY'
+        WHEN m.failed_turns_count > 0 THEN 'CONTAINS_FAILED_TURNS'
+        ELSE 'CONSISTENT_AND_HEALTHY'
+    END AS integrity_status
+FROM metrics m;
+
+
+-- ---------------------------------------------------------
+-- 25. UPDATE CONVERSATION CONTEXT BUDGET
+-- ---------------------------------------------------------
+-- Used by: Context assembler after calculating system prompt and history tokens
+-- Parameters: $1 = conversation_id, $2 = system_prompt_tokens,
+--             $3 = context_window_tokens, $4 = user_id
+
+-- name: ai-update-conversation-context-budget
+UPDATE ai_conversations
+SET system_prompt_tokens = COALESCE($2, system_prompt_tokens),
+    context_window_tokens = COALESCE($3, context_window_tokens),
+    updated_at = NOW()
+WHERE id = $1 AND user_id = $4
+RETURNING id, user_id, title, system_prompt_tokens, context_window_tokens, updated_at;
+
+
+-- ---------------------------------------------------------
+-- 26. GET STREAMING LATENCY SLA BENCHMARK STATS
+-- ---------------------------------------------------------
+-- Used by: GET /api/ai/metrics/latency (Engineering Health & SLA Dashboard)
+-- Computes p50, p95, p99, min, max, avg latencies for completed streams.
+-- Parameters: $1 = window_hours (default 24)
+
+-- name: ai-get-streaming-latency-stats
+SELECT
+    COALESCE($1, 24)                                                                AS window_hours,
+    COUNT(m.id)                                                                     AS completed_stream_count,
+    ROUND(AVG(m.latency_ms)::NUMERIC, 2)                                            AS avg_latency_ms,
+    ROUND(PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.latency_ms)::NUMERIC, 2)   AS p50_latency_ms,
+    ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY m.latency_ms)::NUMERIC, 2)   AS p95_latency_ms,
+    ROUND(PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY m.latency_ms)::NUMERIC, 2)   AS p99_latency_ms,
+    MIN(m.latency_ms)                                                               AS min_latency_ms,
+    MAX(m.latency_ms)                                                               AS max_latency_ms,
+    ROUND(AVG(m.chunk_count)::NUMERIC, 1)                                           AS avg_chunks_per_stream,
+    ROUND(AVG(CASE WHEN m.latency_ms > 0 THEN (m.tokens_used::FLOAT / (m.latency_ms::FLOAT / 1000.0)) ELSE 0 END)::NUMERIC, 2) AS avg_tokens_per_second
+FROM ai_messages m
+JOIN ai_conversations c ON m.conversation_id = c.id
+WHERE m.role = 'assistant'
+  AND m.status = 'completed'
+  AND m.latency_ms IS NOT NULL
+  AND m.created_at >= (NOW() - (COALESCE($1, 24) || ' hours')::INTERVAL);
+
+
+-- ---------------------------------------------------------
+-- 27. GET STREAMING LATENCY BREAKDOWN BY MODEL
+-- ---------------------------------------------------------
+-- Used by: Model performance comparison (Gemini 1.5 Pro vs Gemini 1.5 Flash)
+-- Parameters: $1 = window_days (default 7)
+
+-- name: ai-get-streaming-latency-by-model
+SELECT
+    m.model_version,
+    COUNT(m.id)                                                                     AS message_count,
+    ROUND(AVG(m.latency_ms)::NUMERIC, 2)                                            AS avg_latency_ms,
+    ROUND(PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.latency_ms)::NUMERIC, 2)   AS p50_latency_ms,
+    ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY m.latency_ms)::NUMERIC, 2)   AS p95_latency_ms,
+    MIN(m.latency_ms)                                                               AS min_latency_ms,
+    MAX(m.latency_ms)                                                               AS max_latency_ms,
+    ROUND(AVG(m.tokens_used)::NUMERIC, 1)                                           AS avg_tokens_per_response,
+    ROUND(AVG(CASE WHEN m.latency_ms > 0 THEN (m.tokens_used::FLOAT / (m.latency_ms::FLOAT / 1000.0)) ELSE 0 END)::NUMERIC, 2) AS avg_tokens_per_sec
+FROM ai_messages m
+WHERE m.role = 'assistant'
+  AND m.status = 'completed'
+  AND m.latency_ms IS NOT NULL
+  AND m.created_at >= (NOW() - (COALESCE($1, 7) || ' days')::INTERVAL)
+GROUP BY m.model_version
+ORDER BY message_count DESC;
+
+
+-- ---------------------------------------------------------
+-- 28. GET SLOW STREAMING QUERIES (SLA Outlier Detection)
+-- ---------------------------------------------------------
+-- Used by: Latency alert debugging to inspect requests exceeding threshold (e.g. > 2500ms)
+-- Parameters: $1 = threshold_ms (e.g. 2500), $2 = limit (default 20)
+
+-- name: ai-get-slow-streaming-queries
+SELECT
+    m.id                    AS message_id,
+    m.conversation_id,
+    c.user_id,
+    c.title                 AS conversation_title,
+    m.latency_ms,
+    m.tokens_used,
+    m.chunk_count,
+    m.model_version,
+    LEFT(m.content, 120)    AS content_preview,
+    m.created_at
+FROM ai_messages m
+JOIN ai_conversations c ON m.conversation_id = c.id
+WHERE m.role = 'assistant'
+  AND m.status = 'completed'
+  AND m.latency_ms >= COALESCE($1, 2500)
+ORDER BY m.latency_ms DESC
+LIMIT COALESCE($2, 20);
 
