@@ -254,16 +254,28 @@ export default function Calculator() {
 
   const handleReloadHistory = (entry) => {
     const cat = categories.find(c => c.name.toLowerCase() === entry.category.toLowerCase())
-    if (cat) {
-      setForm(prev => ({
-        ...prev,
-        categoryId: cat.id,
-        activity: entry.activity,
-        quantity: entry.quantity,
-        unit: entry.unit,
-      }))
-      showToast(`Reloaded calculation for "${entry.activity}"`, 'info')
-    }
+    const catId = cat ? cat.id : (form.categoryId || '')
+    const calcCo2e = Number(entry.co2e)
+    const calcQty = Number(entry.quantity) || 1
+    const factor = (calcCo2e / calcQty).toFixed(6)
+
+    setForm(prev => ({
+      ...prev,
+      categoryId: catId,
+      activity: entry.activity,
+      quantity: entry.quantity,
+      unit: entry.unit,
+    }))
+
+    setResult({
+      co2e: entry.co2e,
+      emissionFactor: factor,
+      category: entry.category,
+      unit: 'tCO₂e',
+      source: 'Verified Calculation History',
+    })
+    setSaved(false)
+    showToast(`Reloaded calculation for "${entry.activity}"`, 'info')
   }
 
   const showToast = (message, type = 'success') => {
@@ -578,9 +590,33 @@ export default function Calculator() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: '11px',
                   color: 'var(--accent-primary)',
-                  marginBottom: 'var(--space-lg)',
+                  marginBottom: 'var(--space-md)',
                 }}>
                   {Number(form.quantity).toLocaleString()} ({form.unit}) × {result.emissionFactor} = {Number(result.co2e).toFixed(4)} tCO₂e
+                </div>
+
+                {/* Benchmark Rating Card */}
+                <div style={{
+                  padding: '8px 12px',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-primary)',
+                  marginBottom: 'var(--space-lg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                      Sector Benchmark
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                      {Number(result.co2e) < 1.0 ? 'Within SBTi net-zero target corridor' : Number(result.co2e) < 15.0 ? 'Moderate intensity baseline' : 'Elevated carbon emission source'}
+                    </div>
+                  </div>
+                  <span className={`badge ${Number(result.co2e) < 1.0 ? 'badge-success' : Number(result.co2e) < 15.0 ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: 10 }}>
+                    {Number(result.co2e) < 1.0 ? '✓ Best in Class' : Number(result.co2e) < 15.0 ? '⚡ Moderate' : '⚠ High Impact'}
+                  </span>
                 </div>
 
                 {/* Quick Actions */}
