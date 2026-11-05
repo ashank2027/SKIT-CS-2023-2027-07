@@ -99,7 +99,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ecoinsight_jwt_secret_dev_2026_ski
 
 async function runTests() {
   console.log('====================================================');
-  console.log('  ECOINSIGHT BACKEND SUITE: 26 SEPT - 23 OCT TASKS  ');
+  console.log('  ECOINSIGHT BACKEND SUITE: TASKS THROUGH 20 NOV    ');
   console.log('====================================================\n');
 
   let passed = 0;
@@ -203,6 +203,40 @@ async function runTests() {
     );
     assert.ok(capturedError, 'Should reject import without file');
     assert.strictEqual(capturedError.statusCode, 400);
+  });
+
+  // Test 5: AI Copilot — Chat Input Validation & Intelligence Engine (24 Oct–20 Nov Phase)
+  await test('AI Copilot: Chat input validation & system prompt generation', async () => {
+    const aiController = require('../controllers/aiController');
+    const aiService = require('../services/aiService');
+
+    // 1. Missing message validation
+    let capturedError = null;
+    await aiController.chat(
+      { user: { id: 1 }, body: {} },
+      {},
+      (err) => { capturedError = err; }
+    );
+    assert.ok(capturedError, 'Should reject empty message');
+    assert.strictEqual(capturedError.statusCode, 400);
+
+    // 2. System prompt builder contains user facts
+    const sysPrompt = aiService.buildSystemPrompt(
+      { name: 'Chetan', organization: 'EcoTest Inc', industry: 'Software', location: 'Jaipur' },
+      { total_co2e: 1250.5, record_count: 14, highest_category: 'Electricity', categories: [], recent: [] }
+    );
+    assert.ok(sysPrompt.includes('EcoTest Inc'));
+    assert.ok(sysPrompt.includes('1250.50 kg CO2e'));
+    assert.ok(sysPrompt.includes('Electricity'));
+
+    // 3. Intelligent fallback engine generates contextual reduction advice
+    const fallbackReply = aiService.generateFallbackResponse(
+      'How can I reduce emissions?',
+      { organization: 'EcoTest Inc', industry: 'Technology' },
+      { total_co2e: 500, highest_category: 'Electricity' }
+    );
+    assert.ok(fallbackReply.includes('Electricity'));
+    assert.ok(fallbackReply.includes('500.00 kg CO₂e'));
   });
 
   // Check Database connection for live integration tests
