@@ -41,6 +41,7 @@
  *      - /api/dashboard        → dashboardRoutes  (aggregated dashboard stats)
  *      - /api/analytics        → analyticsRoutes  (multi-dimensional analytics)
  *      - /api/tasks            → taskRoutes       (async task queue management)
+ *      - /api/ai               → aiRoutes         (AI Copilot & conversational sustainability)
  *
  * 5. UNHANDLED ROUTE HANDLER
  *    A catch-all `app.all('*')` handler is registered after all routes. Any
@@ -76,6 +77,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const calculatorRoutes = require('./routes/calculatorRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 // Middleware
 const errorHandler = require('./middleware/errorMiddleware');
@@ -108,6 +110,7 @@ app.use('/api/calculator', calculatorRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Unhandled Route Handler
 app.all('*', (req, res, next) => {
