@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { mockCategories, mockEmissionFactors } from '../data/mockData'
 
@@ -37,11 +38,13 @@ const BENCHMARKS = {
 }
 
 export default function Calculator() {
+  const navigate = useNavigate()
   const [categories, setCategories] = useState([])
   const [factors, setFactors] = useState([])
   const [selectedFactor, setSelectedFactor] = useState(null)
   const [recentCalcs, setRecentCalcs] = useState([])
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false)
+  const [showCompareModal, setShowCompareModal] = useState(false)
   const [form, setForm] = useState({
     categoryId: '',
     activity: '',
@@ -87,7 +90,7 @@ export default function Calculator() {
 
   const saveToHistory = (newEntry) => {
     try {
-      const updated = [newEntry, ...recentCalcs.filter(r => r.timestamp !== newEntry.timestamp)].slice(0, 5)
+      const updated = [newEntry, ...recentCalcs.filter(r => r.timestamp !== newEntry.timestamp)].slice(0, 10)
       setRecentCalcs(updated)
       localStorage.setItem('ecoinsight_calc_history', JSON.stringify(updated))
     } catch {
@@ -199,7 +202,9 @@ export default function Calculator() {
         quantity: form.quantity,
         unit: form.unit,
         co2e: finalResult.co2e,
+        emissionFactor: finalResult.emissionFactor,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: form.date,
       })
     } catch (err) {
       showToast(err.message || 'Calculation failed', 'error')
@@ -239,17 +244,41 @@ export default function Calculator() {
         activity: form.activity,
         co2e: result.co2e,
       })
-      showToast('Calculation attached to ESG draft report!', 'success')
+      showToast('Calculation attached to ESG draft report! Redirecting...', 'success')
+      setTimeout(() => navigate('/reports'), 1500)
     } catch {
-      showToast('Draft report draft queued successfully!', 'success')
+      showToast('Draft report queued successfully! Redirecting...', 'success')
+      setTimeout(() => navigate('/reports'), 1500)
     }
   }
 
   const handleCopySummary = () => {
     if (!result) return
-    const text = `EcoInsight Emission Calculation:\nCategory: ${result.category}\nActivity: ${form.activity}\nQuantity: ${form.quantity} ${form.unit}\nFactor: ${result.emissionFactor}\nTotal CO₂e: ${result.co2e} tCO₂e`
+    const text = `EcoInsight Emission Calculation:\nCategory: ${result.category}\nActivity: ${form.activity}\nQuantity: ${form.quantity} ${form.unit}\nFactor: ${result.emissionFactor}\nTotal CO₂e: ${result.co2e} tCO₂e\nDate: ${form.date}\nLocation: ${form.location || 'N/A'}\nSource: ${result.source || 'GHG Protocol'}`
     navigator.clipboard.writeText(text)
     showToast('Calculation summary copied to clipboard!')
+  }
+
+  const handleExportHistory = () => {
+    if (recentCalcs.length === 0) {
+      showToast('No calculation history to export', 'error')
+      return
+    }
+    const header = 'Category,Activity,Quantity,Unit,CO2e (tCO₂e),Emission Factor,Time,Date'
+    const rows = recentCalcs.map(c =>
+      `"${c.category}","${c.activity}",${c.quantity},"${c.unit}",${c.co2e},${c.emissionFactor || 'N/A'},${c.timestamp},${c.date || 'N/A'}`
+    )
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ecoinsight_calculations_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    showToast('Calculation history exported to CSV!')
   }
 
   const handleReloadHistory = (entry) => {
@@ -283,6 +312,9 @@ export default function Calculator() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  // Get benchmarks for compare modal
+  const currentBenchmarks = currentCategory ? BENCHMARKS[currentCategory.name] || [] : []
+
   return (
     <div className="fade-in">
       {toast && (
@@ -300,7 +332,14 @@ export default function Calculator() {
               Compute greenhouse gas emissions with verified emission factors from IPCC, IEA, and DEFRA databases.
             </p>
           </div>
-          <div className="page-header-actions">
+          <div className="page-header-actions" style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleExportHistory}
+              title="Export calculation history as CSV"
+            >
+              📥 Export History
+            </button>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => setShowBenchmarkModal(!showBenchmarkModal)}
@@ -487,8 +526,20 @@ export default function Calculator() {
             {/* Recent Calculations Drawer */}
             {recentCalcs.length > 0 && (
               <div style={{ marginTop: 'var(--space-xl)', paddingTop: 'var(--space-md)', borderTop: '1px solid var(--border-primary)' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>
-                  Recent Calculations
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+                    Recent Calculations ({recentCalcs.length})
+                  </div>
+                  <button
+                    onClick={handleExportHistory}
+                    style={{
+                      fontSize: 10, padding: '2px 8px', cursor: 'pointer',
+                      background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-primary)', borderRadius: 4,
+                    }}
+                  >
+                    📥 Export CSV
+                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {recentCalcs.map((calc, i) => (
@@ -582,17 +633,41 @@ export default function Calculator() {
                   )}
                 </div>
 
-                {/* Live Formula Card */}
+                {/* Animated Step-by-Step Formula Card */}
                 <div style={{
-                  padding: '10px', background: 'rgba(0, 229, 160, 0.06)',
+                  padding: '12px', background: 'rgba(0, 229, 160, 0.06)',
                   border: '1px solid rgba(0, 229, 160, 0.2)',
                   borderRadius: 'var(--radius-sm)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11px',
-                  color: 'var(--accent-primary)',
                   marginBottom: 'var(--space-md)',
                 }}>
-                  {Number(form.quantity).toLocaleString()} ({form.unit}) × {result.emissionFactor} = {Number(result.co2e).toFixed(4)} tCO₂e
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, textAlign: 'left' }}>
+                    GHG Protocol Formula Breakdown
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{
+                      padding: '6px 10px', background: 'rgba(0, 188, 212, 0.1)', border: '1px solid rgba(0, 188, 212, 0.3)',
+                      borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: '#00bcd4',
+                    }}>
+                      {Number(form.quantity).toLocaleString()} {form.unit}
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--text-tertiary)' }}>×</span>
+                    <div style={{
+                      padding: '6px 10px', background: 'rgba(124, 77, 255, 0.1)', border: '1px solid rgba(124, 77, 255, 0.3)',
+                      borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 12, color: '#7c4dff',
+                    }}>
+                      {result.emissionFactor}
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--text-tertiary)' }}>=</span>
+                    <div style={{
+                      padding: '6px 10px', background: 'rgba(0, 229, 160, 0.15)', border: '1px solid rgba(0, 229, 160, 0.4)',
+                      borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: '#00e5a0',
+                    }}>
+                      {Number(result.co2e).toFixed(4)} tCO₂e
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center' }}>
+                    Activity Data × Emission Factor = Carbon Equivalent
+                  </div>
                 </div>
 
                 {/* Benchmark Rating Card */}
@@ -640,11 +715,18 @@ export default function Calculator() {
                     <button
                       className="btn btn-secondary"
                       style={{ flex: 1, fontSize: 11 }}
-                      onClick={handleCopySummary}
+                      onClick={() => setShowCompareModal(true)}
                     >
-                      📋 Copy Summary
+                      📊 Compare Benchmarks
                     </button>
                   </div>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ width: '100%', fontSize: 11 }}
+                    onClick={handleCopySummary}
+                  >
+                    📋 Copy Summary
+                  </button>
                 </div>
               </div>
             </div>
@@ -692,6 +774,79 @@ export default function Calculator() {
           </div>
         </div>
       </div>
+
+      {/* Compare with Benchmark Modal */}
+      {showCompareModal && result && (
+        <div className="modal-overlay" onClick={() => setShowCompareModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">📊 Benchmark Comparison</h3>
+              <button className="modal-close" onClick={() => setShowCompareModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div style={{
+                textAlign: 'center', padding: 'var(--space-md)', marginBottom: 'var(--space-md)',
+                background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)',
+              }}>
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                  Your Result
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 800, color: 'var(--accent-primary)' }}>
+                  {Number(result.co2e).toFixed(4)} tCO₂e
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {form.activity} • {Number(form.quantity).toLocaleString()} {form.unit}
+                </div>
+              </div>
+
+              {currentBenchmarks.length > 0 ? (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>
+                    Industry Benchmarks — {currentCategory?.name}
+                  </div>
+                  {currentBenchmarks.map((bm, i) => {
+                    const benchmarkCO2e = Number(form.quantity) * bm.factor
+                    const diff = Number(result.co2e) - benchmarkCO2e
+                    const pctDiff = benchmarkCO2e > 0 ? ((diff / benchmarkCO2e) * 100).toFixed(1) : 0
+                    const isBetter = diff <= 0
+
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 12px', marginBottom: 6,
+                        background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)',
+                        border: `1px solid ${isBetter ? 'rgba(0, 229, 160, 0.2)' : 'rgba(255, 171, 0, 0.2)'}`,
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{bm.label}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                            Factor: {bm.factor} → {benchmarkCO2e.toFixed(4)} tCO₂e
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span className={`badge ${isBetter ? 'badge-success' : diff < benchmarkCO2e * 0.5 ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: 10 }}>
+                            {isBetter ? `▼ ${Math.abs(pctDiff)}% better` : `▲ ${pctDiff}% higher`}
+                          </span>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{bm.rating}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 'var(--space-lg)', color: 'var(--text-tertiary)', fontSize: 12 }}>
+                  No industry benchmarks available for this category.
+                  <br />
+                  <span style={{ fontSize: 11 }}>Try selecting Electricity, Transportation, Fuel, or Waste.</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowCompareModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
