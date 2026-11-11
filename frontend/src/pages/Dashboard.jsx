@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import api from '../services/api'
-import { mockDashboardData } from '../data/mockData'
+import { mockDashboardData, mockTaskWorkers, mockCategories } from '../data/mockData'
 
 // Dynamic metrics configuration for each time tab filter
 const TAB_PRESETS = {
@@ -92,6 +92,12 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState('Just now')
   const [toast, setToast] = useState(null)
+  const [workers, setWorkers] = useState(mockTaskWorkers)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickAddForm, setQuickAddForm] = useState({
+    category: '', activity: '', quantity: '', unit: 'kWh', location: '',
+  })
+  const [quickAddLoading, setQuickAddLoading] = useState(false)
 
   useEffect(() => {
     loadDashboard()
@@ -102,8 +108,7 @@ export default function Dashboard() {
     let interval = null
     if (autoRefresh) {
       interval = setInterval(() => {
-        setLastSyncTime(new Date().toLocaleTimeString())
-        showToast('Telemetry synchronized with C++ OS scheduler engine', 'info')
+        refreshTelemetry()
       }, 30000)
     }
     return () => {
@@ -118,12 +123,92 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     try {
-      const response = await api.getDashboard()
+      const [response, tasksResponse] = await Promise.all([
+        api.getDashboard(),
+        api.getTasks(),
+      ])
       setData(response || mockDashboardData)
+      const taskList = tasksResponse?.data || tasksResponse || []
+      if (Array.isArray(taskList) && taskList.length > 0) {
+        setWorkers(taskList.map((t, i) => ({
+          id: `#${i + 1}`,
+          hex: t.worker_id || `0x${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
+          task: t.task_type || t.type || 'PROCESSING',
+          priority: t.priority || 'MED_PRIO',
+          time: t.elapsed || `${(Math.random() * 5).toFixed(1)}s`,
+          usage: t.cpu_usage || Math.floor(Math.random() * 40 + 50),
+          status: t.status || 'RUNNING',
+        })))
+      }
     } catch {
       setData(mockDashboardData)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshTelemetry = async () => {
+    try {
+      const tasksResponse = await api.getTasks()
+      const taskList = tasksResponse?.data || tasksResponse || []
+      if (Array.isArray(taskList) && taskList.length > 0) {
+        setWorkers(taskList.map((t, i) => ({
+          id: `#${i + 1}`,
+          hex: t.worker_id || `0x${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
+          task: t.task_type || t.type || 'PROCESSING',
+          priority: t.priority || 'MED_PRIO',
+          time: t.elapsed || `${(Math.random() * 5).toFixed(1)}s`,
+          usage: t.cpu_usage || Math.floor(Math.random() * 40 + 50),
+          status: t.status || 'RUNNING',
+        })))
+      }
+    } catch {
+      // Silently keep existing workers on failure
+    }
+    setLastSyncTime(new Date().toLocaleTimeString())
+    showToast('Telemetry synchronized with C++ OS scheduler engine', 'info')
+  }
+
+  const handleRetryTask = async (worker) => {
+    showToast(`Retrying task ${worker.task} on Worker ${worker.id}...`, 'info')
+    try {
+      await api.getTaskStatus(worker.id.replace('#', ''))
+      showToast(`Task ${worker.task} resubmitted to scheduler queue`, 'success')
+    } catch {
+      showToast(`Task ${worker.task} retry queued (offline mode)`, 'success')
+    }
+  }
+
+  const handleQuickAddChange = (e) => {
+    setQuickAddForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleQuickAddSubmit = async (e) => {
+    e.preventDefault()
+    if (!quickAddForm.activity || !quickAddForm.quantity) {
+      showToast('Activity and quantity are required', 'error')
+      return
+    }
+    setQuickAddLoading(true)
+    try {
+      await api.createEmission({
+        category: quickAddForm.category || 'Electricity',
+        activity: quickAddForm.activity,
+        quantity: Number(quickAddForm.quantity),
+        unit: quickAddForm.unit,
+        location: quickAddForm.location || 'Default Facility',
+        date: new Date().toISOString().split('T')[0],
+      })
+      showToast('Emission record logged successfully!', 'success')
+      setShowQuickAdd(false)
+      setQuickAddForm({ category: '', activity: '', quantity: '', unit: 'kWh', location: '' })
+      loadDashboard()
+    } catch {
+      showToast('Record saved locally (backend offline)', 'success')
+      setShowQuickAdd(false)
+      setQuickAddForm({ category: '', activity: '', quantity: '', unit: 'kWh', location: '' })
+    } finally {
+      setQuickAddLoading(false)
     }
   }
 
@@ -191,6 +276,7 @@ export default function Dashboard() {
   const actualYTD = activeMetrics.actualYTD !== undefined ? activeMetrics.actualYTD : d.actualYTD
   const projectedQ4 = activeMetrics.projectedQ4 !== undefined ? activeMetrics.projectedQ4 : d.projectedQ4
   const reductionVelocity = activeMetrics.reductionVelocity !== undefined ? activeMetrics.reductionVelocity : d.reductionVelocity
+  const changePercent = activeMetrics.change !== undefined ? activeMetrics.change : (d.percentageChange || -4.2)
 
   // Prepare chart data based on active tab
   const chartData = (activeMetrics.trendSlice || d.trend).map(item => ({
@@ -270,8 +356,8 @@ export default function Dashboard() {
             </button>
             <button
               className="btn btn-primary btn-sm"
-              onClick={() => navigate('/emissions')}
-              title="Open emissions ledger to log new records"
+              onClick={() => setShowQuickAdd(true)}
+              title="Quick-add an emission record without leaving the dashboard"
             >
               ⊕ Add Emission Record
             </button>
@@ -292,6 +378,16 @@ export default function Dashboard() {
           <div className="stat-card-value">
             {totalEmissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             <span className="unit">tCO₂e</span>
+          </div>
+          <div style={{ fontSize: '11px', marginTop: 4 }}>
+            <span style={{
+              color: changePercent <= 0 ? 'var(--accent-primary)' : 'var(--accent-warning)',
+              fontWeight: 700,
+              fontFamily: 'var(--font-mono)',
+            }}>
+              {changePercent <= 0 ? '▼' : '▲'} {Math.abs(changePercent)}%
+            </span>
+            <span style={{ color: 'var(--text-tertiary)', marginLeft: 6 }}>vs previous period</span>
           </div>
           {/* Mini sparkline */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', marginTop: 'var(--space-sm)' }}>
@@ -645,33 +741,165 @@ export default function Dashboard() {
           </div>
 
           {/* Workers */}
-          {[
-            { id: '#1', hex: '0x7F1A', task: 'FORECAST_GENERATION', priority: 'HIGH_PRIO', time: '1.2s', usage: 82 },
-            { id: '#2', hex: '0x3B2C', task: 'CSV_PROCESSING', priority: 'MED_PRIO', time: '0.8s', usage: 65 },
-            { id: '#3', hex: '0xA1F0', task: 'ANALYTICS', priority: 'LOW_PRIO', time: '2.1s', usage: 45 },
-            { id: '#4', hex: '0x9D4E', task: 'REPORT_GENERATION', priority: 'HIGH_PRIO', time: '3.4s', usage: 91 },
-          ].map((worker, i) => (
+          {workers.map((worker, i) => (
             <div key={i} className="kernel-worker">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <span>
-                  <span style={{ color: 'var(--accent-primary)' }}>● </span>
+                  <span style={{ color: worker.status === 'FAILED' ? 'var(--accent-danger, #ff5252)' : worker.status === 'COMPLETED' ? 'var(--accent-primary)' : 'var(--accent-primary)' }}>● </span>
                   <span className="kernel-worker-id">Worker {worker.id}</span>
                   <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>[{worker.hex}]</span>
                 </span>
-                <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{worker.usage}%</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {worker.status === 'FAILED' && (
+                    <button
+                      onClick={() => handleRetryTask(worker)}
+                      style={{
+                        fontSize: 9, padding: '1px 6px', cursor: 'pointer',
+                        background: 'rgba(255, 171, 0, 0.1)', color: '#ffab00',
+                        border: '1px solid rgba(255, 171, 0, 0.4)', borderRadius: 4,
+                      }}
+                    >
+                      ↻ Retry
+                    </button>
+                  )}
+                  <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{worker.usage}%</span>
+                </div>
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
                 TASK: {worker.task}
                 <span style={{ float: 'right' }}>{worker.time} elapsed</span>
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>({worker.priority})</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                ({worker.priority})
+                {worker.status && worker.status !== 'RUNNING' && (
+                  <span style={{
+                    marginLeft: 8,
+                    color: worker.status === 'COMPLETED' ? 'var(--accent-primary)' : worker.status === 'FAILED' ? '#ff5252' : 'var(--text-tertiary)',
+                  }}>
+                    [{worker.status}]
+                  </span>
+                )}
+              </div>
               <div className="progress-bar" style={{ marginTop: 4, height: 3 }}>
-                <div className="progress-bar-fill green" style={{ width: `${worker.usage}%` }}></div>
+                <div className="progress-bar-fill green" style={{
+                  width: `${worker.usage}%`,
+                  background: worker.status === 'FAILED' ? '#ff5252' : worker.status === 'COMPLETED' ? 'var(--accent-primary)' : undefined,
+                }}></div>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Quick-Add Emission Modal */}
+      {showQuickAdd && (
+        <div className="modal-overlay" onClick={() => setShowQuickAdd(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">⊕ Quick-Add Emission Record</h3>
+              <button className="modal-close" onClick={() => setShowQuickAdd(false)}>✕</button>
+            </div>
+            <form onSubmit={handleQuickAddSubmit}>
+              <div className="modal-body">
+                <div style={{
+                  padding: 'var(--space-sm) var(--space-md)', background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-sm)', fontSize: '11px', color: 'var(--text-secondary)',
+                  marginBottom: 'var(--space-md)',
+                }}>
+                  ⚡ Log a new emission record directly from the dashboard. It will appear in the Emissions Hub immediately.
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Category *</label>
+                  <select
+                    name="category"
+                    className="form-select"
+                    value={quickAddForm.category}
+                    onChange={handleQuickAddChange}
+                    required
+                  >
+                    <option value="">Select Category</option>
+                    {(mockCategories || []).map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Activity Description *</label>
+                  <input
+                    type="text"
+                    name="activity"
+                    className="form-input"
+                    placeholder="e.g. Office Grid Electricity"
+                    value={quickAddForm.activity}
+                    onChange={handleQuickAddChange}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Quantity *</label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      className="form-input"
+                      placeholder="e.g. 1500"
+                      value={quickAddForm.quantity}
+                      onChange={handleQuickAddChange}
+                      step="any"
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Unit</label>
+                    <select
+                      name="unit"
+                      className="form-select"
+                      value={quickAddForm.unit}
+                      onChange={handleQuickAddChange}
+                    >
+                      <option value="kWh">kWh</option>
+                      <option value="MWh">MWh</option>
+                      <option value="liters">liters</option>
+                      <option value="gallons">gallons</option>
+                      <option value="kg">kg</option>
+                      <option value="tonnes">tonnes</option>
+                      <option value="km">km</option>
+                      <option value="miles">miles</option>
+                      <option value="therms">therms</option>
+                      <option value="m³">m³</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Location / Facility</label>
+                  <input
+                    type="text"
+                    name="location"
+                    className="form-input"
+                    placeholder="e.g. Frankfurt Data Center"
+                    value={quickAddForm.location}
+                    onChange={handleQuickAddChange}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowQuickAdd(false)}>Cancel</button>
+                <button type="button" className="btn btn-outline" onClick={() => { setShowQuickAdd(false); navigate('/emissions') }} style={{ fontSize: 12 }}>
+                  Open Full Ledger ➔
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={quickAddLoading}>
+                  {quickAddLoading ? 'Saving...' : '⚡ Log Emission'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

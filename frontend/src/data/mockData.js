@@ -137,6 +137,13 @@ export const mockAnalyticsData = {
   ],
 }
 
+export const mockTaskWorkers = [
+  { id: '#1', hex: '0x7F1A', task: 'FORECAST_GENERATION', priority: 'HIGH_PRIO', time: '1.2s', usage: 82, status: 'RUNNING' },
+  { id: '#2', hex: '0x3B2C', task: 'CSV_PROCESSING', priority: 'MED_PRIO', time: '0.8s', usage: 65, status: 'RUNNING' },
+  { id: '#3', hex: '0xA1F0', task: 'ANALYTICS', priority: 'LOW_PRIO', time: '2.1s', usage: 45, status: 'COMPLETED' },
+  { id: '#4', hex: '0x9D4E', task: 'REPORT_GENERATION', priority: 'HIGH_PRIO', time: '3.4s', usage: 91, status: 'RUNNING' },
+]
+
 export const mockEmissionFactors = [
   { id: 1, category_id: 1, category: 'Electricity', activity: 'Grid Electricity', unit: 'kWh', factor: 0.000385, source: 'IEA / European Grid Average 2026' },
   { id: 2, category_id: 1, category: 'Electricity', activity: 'Renewable Hydro/Solar Grid', unit: 'kWh', factor: 0.000045, source: 'GHG Protocol Scope 2' },
