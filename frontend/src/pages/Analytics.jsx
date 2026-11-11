@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, Legend,
@@ -14,23 +15,44 @@ const SECTOR_COLORS = {
 }
 
 export default function Analytics() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeView, setActiveView] = useState('overview')
-  const [compareYoY, setCompareYoY] = useState(true)
+  const [activeView, setActiveView] = useState(searchParams.get('view') || 'overview')
+  const [compareYoY, setCompareYoY] = useState(searchParams.get('yoy') !== 'false')
   const [toast, setToast] = useState(null)
+  const [printMode, setPrintMode] = useState(false)
+
+  // Sort state for drilldown tables
+  const [sortField, setSortField] = useState('value')
+  const [sortAsc, setSortAsc] = useState(false)
+
   const [filters, setFilters] = useState({
-    from: '',
-    to: '',
-    category: '',
-    location: '',
-    industry: '',
-    sector: '',
+    from: searchParams.get('from') || '',
+    to: searchParams.get('to') || '',
+    category: searchParams.get('category') || '',
+    location: searchParams.get('location') || '',
+    industry: searchParams.get('industry') || '',
+    sector: searchParams.get('sector') || '',
   })
 
   useEffect(() => {
     loadAnalytics()
   }, [])
+
+  // Sync state to URL search parameters for link persistence
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (activeView !== 'overview') params.set('view', activeView)
+    if (!compareYoY) params.set('yoy', 'false')
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+    if (filters.category) params.set('category', filters.category)
+    if (filters.location) params.set('location', filters.location)
+    if (filters.industry) params.set('industry', filters.industry)
+    if (filters.sector) params.set('sector', filters.sector)
+    setSearchParams(params, { replace: true })
+  }, [activeView, compareYoY, filters, setSearchParams])
 
   const loadAnalytics = async (customFilters = filters) => {
     try {
@@ -50,6 +72,7 @@ export default function Analytics() {
   const applyFilters = () => {
     setLoading(true)
     loadAnalytics(filters)
+    showToast('Filters applied & analytics updated', 'success')
   }
 
   const resetFilters = () => {
@@ -57,6 +80,7 @@ export default function Analytics() {
     setFilters(defaultFilters)
     setLoading(true)
     loadAnalytics(defaultFilters)
+    showToast('Filters reset to default values', 'info')
   }
 
   const showToast = (message, type = 'success') => {
@@ -113,15 +137,66 @@ export default function Analytics() {
     showToast('Analytics export downloaded successfully!')
   }
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <div className="loader"></div>
-      </div>
-    )
+  const handlePrint = () => {
+    setPrintMode(true)
+    setTimeout(() => {
+      window.print()
+      setPrintMode(false)
+    }, 300)
+  }
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc)
+    } else {
+      setSortField(field)
+      setSortAsc(false)
+    }
   }
 
   const d = data || mockAnalyticsData
+
+  const totalEmissions = useMemo(() => {
+    return (d.emissionsByCategory || []).reduce((acc, curr) => acc + (curr.value || 0), 0)
+  }, [d])
+
+  const avgMonthly = useMemo(() => {
+    return Math.round(totalEmissions / ((d.emissionsByTime || []).length || 1))
+  }, [totalEmissions, d])
+
+  // Sorted views for drilldown tables
+  const sortedIndustryData = useMemo(() => {
+    return [...(d.emissionsByIndustry || [])].sort((a, b) => {
+      const valA = sortField === 'name' ? a.name : a.value
+      const valB = sortField === 'name' ? b.name : b.value
+      if (typeof valA === 'string') {
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA)
+      }
+      return sortAsc ? valA - valB : valB - valA
+    })
+  }, [d, sortField, sortAsc])
+
+  const sortedLocationData = useMemo(() => {
+    return [...(d.emissionsByLocation || [])].sort((a, b) => {
+      const valA = sortField === 'name' ? a.name : a.value
+      const valB = sortField === 'name' ? b.name : b.value
+      if (typeof valA === 'string') {
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA)
+      }
+      return sortAsc ? valA - valB : valB - valA
+    })
+  }, [d, sortField, sortAsc])
+
+  const sortedCategoryData = useMemo(() => {
+    return [...(d.emissionsByCategory || [])].sort((a, b) => {
+      const valA = sortField === 'name' ? a.name : a.value
+      const valB = sortField === 'name' ? b.name : b.value
+      if (typeof valA === 'string') {
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA)
+      }
+      return sortAsc ? valA - valB : valB - valA
+    })
+  }, [d, sortField, sortAsc])
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -142,11 +217,16 @@ export default function Analytics() {
     return null
   }
 
-  const totalEmissions = (d.emissionsByCategory || []).reduce((acc, curr) => acc + (curr.value || 0), 0)
-  const avgMonthly = Math.round(totalEmissions / ((d.emissionsByTime || []).length || 1))
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <div className="loader"></div>
+      </div>
+    )
+  }
 
   return (
-    <div className="fade-in">
+    <div className={`fade-in ${printMode ? 'print-layout' : ''}`}>
       {/* Toast Alert */}
       {toast && (
         <div className={`toast ${toast.type}`}>
@@ -163,8 +243,11 @@ export default function Analytics() {
               Multi-dimensional emission analysis across time, category, location, industry, and GHG protocol scopes.
             </p>
           </div>
-          <div className="page-header-actions">
-            <button className="btn btn-secondary btn-sm" onClick={handleExportAnalysis}>
+          <div className="page-header-actions" style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={handlePrint} title="Print or save as PDF audit view">
+              🖨️ Print / Audit View
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={handleExportAnalysis} title="Export full analysis as CSV">
               📊 Export Analysis (CSV)
             </button>
           </div>
@@ -542,27 +625,31 @@ export default function Analytics() {
         </div>
       )}
 
-      {/* ── Drill-down Detail Tables for Specific Views ── */}
+      {/* ── Drill-down Detail Tables with Column Sorting ── */}
       {activeView === 'by-industry' && (
         <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="card-title">Industry Emissions Benchmark Audit</div>
-            <span className="badge badge-info">Sector Breakdown</span>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Click table headers to sort</div>
           </div>
           <div className="card-body">
             <div className="table-responsive">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Industry Sector</th>
-                    <th>Emissions (tCO₂e)</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                      Industry Sector {sortField === 'name' ? (sortAsc ? '▲' : '▼') : '↕'}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('value')}>
+                      Emissions (tCO₂e) {sortField === 'value' ? (sortAsc ? '▲' : '▼') : '↕'}
+                    </th>
                     <th>Total Share (%)</th>
                     <th>Sector Benchmark</th>
                     <th>Compliance Target</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(d.emissionsByIndustry || []).map((ind, i) => (
+                  {sortedIndustryData.map((ind, i) => (
                     <tr key={i}>
                       <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{ind.name}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{Number(ind.value).toLocaleString()} t</td>
@@ -661,23 +748,27 @@ export default function Analytics() {
 
       {activeView === 'by-category' && (
         <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="card-title">Activity Category Source Audit</div>
-            <span className="badge badge-info">Direct Activity Distribution</span>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Click headers to sort</div>
           </div>
           <div className="card-body">
             <div className="table-responsive">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Category</th>
-                    <th>Emissions (tCO₂e)</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                      Category {sortField === 'name' ? (sortAsc ? '▲' : '▼') : '↕'}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('value')}>
+                      Emissions (tCO₂e) {sortField === 'value' ? (sortAsc ? '▲' : '▼') : '↕'}
+                    </th>
                     <th>Proportion</th>
                     <th>Decarbonization Priority</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(d.emissionsByCategory || []).map((c, i) => {
+                  {sortedCategoryData.map((c, i) => {
                     const share = Math.round((c.value / totalEmissions) * 100)
                     return (
                       <tr key={i}>
@@ -701,23 +792,27 @@ export default function Analytics() {
 
       {activeView === 'by-location' && (
         <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="card-title">Facility & Geographic Emission Inventory</div>
-            <span className="badge badge-info">Regional Analysis</span>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Click headers to sort</div>
           </div>
           <div className="card-body">
             <div className="table-responsive">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Location / Facility</th>
-                    <th>Emissions (tCO₂e)</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                      Location / Facility {sortField === 'name' ? (sortAsc ? '▲' : '▼') : '↕'}
+                    </th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => handleSort('value')}>
+                      Emissions (tCO₂e) {sortField === 'value' ? (sortAsc ? '▲' : '▼') : '↕'}
+                    </th>
                     <th>Proportion</th>
                     <th>Grid Cleanliness</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(d.emissionsByLocation || []).map((loc, i) => {
+                  {sortedLocationData.map((loc, i) => {
                     const share = Math.round((loc.value / totalEmissions) * 100)
                     return (
                       <tr key={i}>
@@ -735,13 +830,13 @@ export default function Analytics() {
         </div>
       )}
 
-      {/* Summary KPI Stats */}
+      {/* Summary KPI Stats with Dynamic Delta Badges */}
       <div className="grid-4">
         {[
-          { label: 'Total Tracked Emissions', value: `${totalEmissions.toLocaleString()} t`, change: '-7.2% vs baseline', color: 'var(--accent-primary)' },
-          { label: 'Avg Monthly Intensity', value: `${avgMonthly.toLocaleString()} t`, change: '-3.2% MoM', color: 'var(--accent-primary)' },
+          { label: 'Total Tracked Emissions', value: `${totalEmissions.toLocaleString()} t`, change: '▼ 7.2% vs baseline', color: 'var(--accent-primary)' },
+          { label: 'Avg Monthly Intensity', value: `${avgMonthly.toLocaleString()} t`, change: '▼ 3.2% MoM', color: 'var(--accent-primary)' },
           { label: 'Industries Covered', value: `${(d.emissionsByIndustry || []).length} Sectors`, change: 'Technology leading', color: 'var(--accent-secondary)' },
-          { label: 'GHG Protocol Compliance', value: '100% (Scopes 1-3)', change: 'Audited factors', color: 'var(--accent-tertiary)' },
+          { label: 'GHG Protocol Compliance', value: '100% (Scopes 1-3)', change: 'Audited factors', color: 'var(--accent-primary)' },
         ].map((stat, i) => (
           <div key={i} className="stat-card">
             <div className="stat-card-label">{stat.label}</div>
