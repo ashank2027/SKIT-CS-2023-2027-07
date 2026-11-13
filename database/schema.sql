@@ -1,38 +1,38 @@
 -- ============================================================================
 -- ECOINSIGHT — PostgreSQL Database Schema
 -- ============================================================================
--- Author:  Bhavya Chautharamani
+-- Author:  Bhavya Chautharamani (Lead Database Engineer)
 -- Project: EcoInsight (SKIT-CS-2023-2027-07)
--- Phase:   MVP — 26 September 2026
+-- Phase:   Phase 11 (Completed to 30 December 2026)
 -- 
 -- This schema implements the shared database contract defined in:
 --   - EcoInsight_Complete_Project_Master_Document
 --   - EcoInsight_Frontend_Backend_Database_Contract
 --   - EcoInsight_Master_Team_Task_Specification_for_Codex
 --
--- Core tables (MVP):
---   1. users
---   2. emission_categories
---   3. emission_factors
---   4. emission_records
---   5. tasks
---   6. reports
+-- Table Inventory:
+--   1. users                    (MVP — Auth, profile, organization)
+--   2. emission_categories      (MVP — 6 environmental classification sectors)
+--   3. emission_factors         (Phase 8 — 40+ international conversion factors & unit indexes)
+--   4. emission_records         (MVP/Phase 8 — Core emission logs with fast batch composite indexes)
+--   5. tasks                    (MVP/Scheduler — OS-inspired background task lifecycle & queues)
+--   6. reports                  (Phase 11 Enhanced — PDF generation metadata, task linking & JSON summaries)
+--   7. ai_conversations         (Phase 9 — Copilot threads, token budgeting, full-text title GIN)
+--   8. ai_messages              (Phase 9 Enhanced — Role-based chat turns, SSE streaming, latency & SLA percentiles)
+--   9. forecasts                (Phase 10 — Predictive ML emission projections & variance intervals)
 --
--- Later-phase tables (NOT created here):
---   - ai_conversations
---   - ai_messages
---   - forecasts
---
--- Relationships:
+-- Relational Cardinalities:
 --   users 1:N emission_records
 --   emission_categories 1:N emission_records
 --   emission_categories 1:N emission_factors
 --   users 1:N tasks
 --   users 1:N reports
+--   tasks 1:N reports (optional background generation linkage)
+--   users 1:N ai_conversations
+--   ai_conversations 1:N ai_messages
+--   users 1:N forecasts
+--   tasks 1:N forecasts (optional background generation linkage)
 -- ============================================================================
-
--- Enable UUID extension (optional, using SERIAL for simplicity per contract)
--- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 BEGIN;
 
@@ -219,11 +219,12 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
 CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks (task_type);
 
 
+
 -- ============================================================================
--- 6. REPORTS
+-- 6. REPORTS (Phase 11 Enhanced — 30 December 2026)
 -- ============================================================================
--- Report metadata — actual report files stored on filesystem/cloud.
--- Consumed by: POST/GET/DELETE /api/reports
+-- Report metadata & PDF artifact reference management.
+-- Consumed by: POST/GET/DELETE /api/reports, C++ Scheduler PDF engine.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS reports (
@@ -231,6 +232,10 @@ CREATE TABLE IF NOT EXISTS reports (
     user_id         INTEGER         NOT NULL
                         REFERENCES users (id)
                         ON DELETE CASCADE
+                        ON UPDATE CASCADE,
+    task_id         INTEGER         DEFAULT NULL
+                        REFERENCES tasks (id)
+                        ON DELETE SET NULL
                         ON UPDATE CASCADE,
     report_type     VARCHAR(50)     NOT NULL DEFAULT 'SUSTAINABILITY'
                         CHECK (report_type IN (
@@ -242,14 +247,23 @@ CREATE TABLE IF NOT EXISTS reports (
                         )),
     period_start    DATE            NOT NULL,
     period_end      DATE            NOT NULL,
-    status          VARCHAR(20)     NOT NULL DEFAULT 'PENDING'
+    status          VARCHAR(20)     NOT NULL DEFAULT 'QUEUED'
                         CHECK (status IN (
                             'PENDING',
+                            'QUEUED',
                             'GENERATING',
+                            'RUNNING',
                             'COMPLETED',
                             'FAILED'
                         )),
-    file_reference  TEXT,
+    file_reference  TEXT            DEFAULT NULL,
+    file_size_bytes BIGINT          DEFAULT NULL
+                        CHECK (file_size_bytes IS NULL OR file_size_bytes >= 0),
+    download_count  INTEGER         NOT NULL DEFAULT 0
+                        CHECK (download_count >= 0),
+    generated_at    TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    error_message   TEXT            DEFAULT NULL,
+    summary_json    JSONB           DEFAULT NULL,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
@@ -257,11 +271,14 @@ CREATE TABLE IF NOT EXISTS reports (
     CHECK (period_end >= period_start)
 );
 
--- Index: user-scoped report queries
+-- Indexes for user-scoped pagination and scheduler task integration
+CREATE INDEX IF NOT EXISTS idx_reports_user_created ON reports (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_user ON reports (user_id);
-
--- Index: report status filtering
+CREATE INDEX IF NOT EXISTS idx_reports_task_id ON reports (task_id) WHERE task_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (status);
+CREATE INDEX IF NOT EXISTS idx_reports_period_range ON reports (user_id, period_start, period_end);
+
 
 
 -- ============================================================================
@@ -299,6 +316,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_id
 
 CREATE INDEX IF NOT EXISTS idx_ai_conversations_title_tsv 
     ON ai_conversations USING gin (to_tsvector('english', title));
+
 
 
 -- ============================================================================
@@ -358,6 +376,62 @@ CREATE INDEX IF NOT EXISTS idx_ai_messages_convo_role_created
     ON ai_messages (conversation_id, role, created_at ASC);
 
 
+
+-- ============================================================================
+-- 9. FORECASTS (Phase 10 — 18 December 2026)
+-- ============================================================================
+-- Stores predictive carbon emission projections generated by ML models
+-- (Linear Regression, Polynomial, Neural Prophet).
+-- Strict separation: actual emission_records remain clean and separate.
+-- Consumed by: GET /api/forecast, POST /api/forecast/generate,
+--              C++ Forecasting Engine.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS forecasts (
+    id                  SERIAL PRIMARY KEY,
+    user_id             INTEGER         NOT NULL
+                            REFERENCES users (id)
+                            ON DELETE CASCADE
+                            ON UPDATE CASCADE,
+    task_id             INTEGER         DEFAULT NULL
+                            REFERENCES tasks (id)
+                            ON DELETE SET NULL
+                            ON UPDATE CASCADE,
+    period              VARCHAR(7)      NOT NULL
+                            CHECK (period ~ '^\d{4}-\d{2}$'),
+    predicted_co2e      NUMERIC(14, 4)  NOT NULL
+                            CHECK (predicted_co2e >= 0),
+    confidence_lower    NUMERIC(14, 4)  DEFAULT NULL
+                            CHECK (confidence_lower IS NULL OR confidence_lower >= 0),
+    confidence_upper    NUMERIC(14, 4)  DEFAULT NULL
+                            CHECK (confidence_upper IS NULL OR confidence_upper >= confidence_lower),
+    model_version       VARCHAR(50)     NOT NULL DEFAULT 'linear-regression-v1',
+    created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+    -- Unique forecast point per user, period, and model version
+    CONSTRAINT uq_forecasts_user_period_model UNIQUE (user_id, period, model_version)
+);
+
+-- User-scoped forecast retrieval ordered by monthly period
+CREATE INDEX IF NOT EXISTS idx_forecasts_user_period
+    ON forecasts (user_id, period ASC);
+
+-- Fast lookup by scheduler task ID for worker verification and batch updates
+CREATE INDEX IF NOT EXISTS idx_forecasts_task
+    ON forecasts (task_id)
+    WHERE task_id IS NOT NULL;
+
+-- Chronological index for cross-user trend aggregation
+CREATE INDEX IF NOT EXISTS idx_forecasts_period
+    ON forecasts (period ASC);
+
+-- Model version comparisons and user-scoped model benchmarks
+CREATE INDEX IF NOT EXISTS idx_forecasts_user_model
+    ON forecasts (user_id, model_version);
+
+
+
 -- ============================================================================
 -- TRIGGER: auto-update updated_at on row modification
 -- ============================================================================
@@ -393,6 +467,11 @@ CREATE TRIGGER trg_reports_updated_at
 
 CREATE TRIGGER trg_ai_conversations_updated_at
     BEFORE UPDATE ON ai_conversations
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_forecasts_updated_at
+    BEFORE UPDATE ON forecasts
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

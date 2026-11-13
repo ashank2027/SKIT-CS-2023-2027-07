@@ -291,6 +291,39 @@ INSERT INTO emission_records (user_id, category_id, activity, quantity, unit, em
     (10, 2, 'Diesel Car',           4000.0000, 'km',     0.171000,  684.0000, 'Ahmedabad, India',  '2026-06-20'),
     (10, 6, 'Industrial Natural Gas', 400.0000, 'cubic_m', 2.020000, 808.0000, 'Ahmedabad, India', '2026-07-10');
 
+-- ---- Oct – Dec 2026 Historical Emission Records (Phase 10 & 11 Extension) ----
+-- Extended data feed providing continuous monthly actuals up to 30 December 2026
+-- for model training, actual vs forecast benchmarking, and quarterly PDF audits.
+INSERT INTO emission_records (user_id, category_id, activity, quantity, unit, emission_factor, co2e, location, date) VALUES
+    -- User 1: Aarav Mehta (IT, Mumbai) — Q4 Actuals
+    (1, 1, 'Grid Electricity',     4400.0000, 'kWh',     0.820000, 3608.0000, 'Mumbai, India',     '2026-10-15'),
+    (1, 2, 'Petrol Car',           1100.0000, 'km',      0.192000,  211.2000, 'Mumbai, India',     '2026-10-22'),
+    (1, 6, 'Natural Gas Cooking',    75.0000,  'cubic_m', 2.020000, 151.5000, 'Mumbai, India',     '2026-10-28'),
+    (1, 1, 'Grid Electricity',     4250.0000, 'kWh',     0.820000, 3485.0000, 'Mumbai, India',     '2026-11-15'),
+    (1, 2, 'Electric Vehicle (EV)',1400.0000, 'km',      0.053000,   74.2000, 'Mumbai, India',     '2026-11-20'),
+    (1, 4, 'Recycled Waste',        180.0000, 'kg',      0.021000,    3.7800, 'Mumbai, India',     '2026-11-29'),
+    (1, 1, 'Grid Electricity',     4100.0000, 'kWh',     0.820000, 3362.0000, 'Mumbai, India',     '2026-12-12'),
+    (1, 2, 'Petrol Car',            950.0000, 'km',      0.192000,  182.4000, 'Mumbai, India',     '2026-12-20'),
+    (1, 5, 'Municipal Water Supply', 40.0000,  'kl',     0.344000,   13.7600, 'Mumbai, India',     '2026-12-28'),
+
+    -- User 2: Priya Sharma (Manufacturing, Delhi) — Q4 Actuals
+    (2, 1, 'Grid Electricity',    11800.0000, 'kWh',     0.820000, 9676.0000, 'Delhi, India',      '2026-10-10'),
+    (2, 3, 'Diesel Combustion',    2400.0000, 'litre',   2.680000, 6432.0000, 'Delhi, India',      '2026-10-18'),
+    (2, 1, 'Grid Electricity',    11200.0000, 'kWh',     0.820000, 9184.0000, 'Delhi, India',      '2026-11-10'),
+    (2, 3, 'Diesel Combustion',    2200.0000, 'litre',   2.680000, 5896.0000, 'Delhi, India',      '2026-11-22'),
+    (2, 1, 'Grid Electricity',    10800.0000, 'kWh',     0.820000, 8856.0000, 'Delhi, India',      '2026-12-10'),
+    (2, 3, 'Diesel Combustion',    2100.0000, 'litre',   2.680000, 5628.0000, 'Delhi, India',      '2026-12-20'),
+
+    -- User 3: Rohan Gupta (Energy, Bangalore) — Q4 Actuals
+    (3, 1, 'Grid Electricity',     8200.0000, 'kWh',     0.820000, 6724.0000, 'Bangalore, India',  '2026-10-20'),
+    (3, 1, 'Solar Electricity',    2500.0000, 'kWh',     0.050000,  125.0000, 'Bangalore, India',  '2026-11-15'),
+    (3, 1, 'Grid Electricity',     7800.0000, 'kWh',     0.820000, 6396.0000, 'Bangalore, India',  '2026-12-18'),
+
+    -- User 5: Vikram Singh (Transportation, Chennai) — Q4 Actuals
+    (5, 2, 'Diesel Car',           7200.0000, 'km',      0.171000, 1231.2000, 'Chennai, India',    '2026-10-12'),
+    (5, 3, 'Diesel Combustion',    3600.0000, 'litre',   2.680000, 9648.0000, 'Chennai, India',    '2026-11-18'),
+    (5, 2, 'Electric Vehicle (EV)',3500.0000, 'km',      0.053000,  185.5000, 'Chennai, India',    '2026-12-15');
+
 
 -- ============================================================================
 -- 5. AI COPILOT SEED DATA (Phase 9 — 24 October – 20 November 2026)
@@ -475,21 +508,147 @@ SELECT setval('ai_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_co
 SELECT setval('ai_messages_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_messages));
 
 
+-- ============================================================================
+-- 6. TASKS SEED DATA (C++ Scheduler Background Tasks)
+-- ============================================================================
+-- Tasks assigned to Ashank's C++ Scheduler for Forecast generation and PDF reports.
+-- Supports testing of task states: QUEUED, RUNNING, COMPLETED, FAILED, RETRYING.
+
+INSERT INTO tasks (
+    id,
+    user_id,
+    task_type,
+    priority,
+    status,
+    retry_count,
+    created_at,
+    started_at,
+    completed_at,
+    result_reference,
+    error_message
+) VALUES
+    (1, 1, 'FORECAST',           2, 'COMPLETED', 0, '2026-12-10 10:00:00+00', '2026-12-10 10:00:01+00', '2026-12-10 10:00:05+00', 'forecasts:user_1:2027-01..2027-03', NULL),
+    (2, 1, 'REPORT_GENERATION',  3, 'COMPLETED', 0, '2026-10-02 11:28:00+00', '2026-10-02 11:28:02+00', '2026-10-02 11:30:00+00', '/storage/reports/2026_q3_sustainability_user1.pdf', NULL),
+    (3, 1, 'REPORT_GENERATION',  2, 'COMPLETED', 0, '2026-12-02 09:12:00+00', '2026-12-02 09:12:02+00', '2026-12-02 09:15:00+00', '/storage/reports/2026_11_monthly_user1.pdf', NULL),
+    (4, 2, 'REPORT_GENERATION',  3, 'COMPLETED', 0, '2026-10-05 14:18:00+00', '2026-10-05 14:18:01+00', '2026-10-05 14:20:00+00', '/storage/reports/2026_q3_manufacturing_user2.pdf', NULL),
+    (5, 2, 'FORECAST',           2, 'COMPLETED', 0, '2026-12-15 15:30:00+00', '2026-12-15 15:30:01+00', '2026-12-15 15:30:06+00', 'forecasts:user_2:2027-01..2027-03', NULL),
+    (6, 3, 'REPORT_GENERATION',  2, 'RUNNING',   0, '2026-12-30 18:00:00+00', '2026-12-30 18:00:02+00', NULL, NULL, NULL),
+    (7, 1, 'REPORT_GENERATION',  1, 'QUEUED',    0, '2026-12-30 20:15:00+00', NULL, NULL, NULL, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ============================================================================
+-- 7. FORECASTS SEED DATA (Phase 10 — 18 December 2026)
+-- ============================================================================
+-- Persists predictive emissions projections (90-day trajectory) with confidence intervals.
+-- Demonstrates actual-vs-predicted historical alignment and forward predictions.
+
+INSERT INTO forecasts (
+    id,
+    user_id,
+    task_id,
+    period,
+    predicted_co2e,
+    confidence_lower,
+    confidence_upper,
+    model_version,
+    created_at,
+    updated_at
+) VALUES
+    -- User 1: Aarav Mehta (IT, Mumbai) — Historical validation overlap
+    (1,  1, 1, '2026-10',  3720.0000, 3550.0000, 3890.0000, 'linear-regression-v1', '2026-12-10 10:00:05+00', '2026-12-10 10:00:05+00'),
+    (2,  1, 1, '2026-11',  3580.0000, 3400.0000, 3760.0000, 'linear-regression-v1', '2026-12-10 10:00:05+00', '2026-12-10 10:00:05+00'),
+    (3,  1, 1, '2026-12',  3440.0000, 3250.0000, 3630.0000, 'linear-regression-v1', '2026-12-10 10:00:05+00', '2026-12-10 10:00:05+00'),
+
+    -- User 1: Forward 90-day trajectory (Q1 2027)
+    (4,  1, 1, '2027-01',  3320.0000, 3120.0000, 3520.0000, 'linear-regression-v1', '2026-12-10 10:00:05+00', '2026-12-10 10:00:05+00'),
+    (5,  1, 1, '2027-02',  3210.0000, 2990.0000, 3430.0000, 'linear-regression-v1', '2026-12-10 10:00:05+00', '2026-12-10 10:00:05+00'),
+    (6,  1, 1, '2027-03',  3110.0000, 2870.0000, 3350.0000, 'linear-regression-v1', '2026-12-10 10:00:05+00', '2026-12-10 10:00:05+00'),
+
+    -- User 2: Priya Sharma (Manufacturing, Delhi) — Forward 90-day trajectory (Q1 2027)
+    (7,  2, 5, '2027-01', 24200.0000, 22800.0000, 25600.0000, 'neural-prophet-v1', '2026-12-15 15:30:06+00', '2026-12-15 15:30:06+00'),
+    (8,  2, 5, '2027-02', 23500.0000, 22000.0000, 25000.0000, 'neural-prophet-v1', '2026-12-15 15:30:06+00', '2026-12-15 15:30:06+00'),
+    (9,  2, 5, '2027-03', 22800.0000, 21200.0000, 24400.0000, 'neural-prophet-v1', '2026-12-15 15:30:06+00', '2026-12-15 15:30:06+00')
+ON CONFLICT (user_id, period, model_version) DO NOTHING;
+
+
+-- ============================================================================
+-- 8. REPORTS SEED DATA (Phase 11 Enhanced — 30 December 2026)
+-- ============================================================================
+-- Audit reports with PDF references, file size metrics, download counts, and summary JSON.
+
+INSERT INTO reports (
+    id,
+    user_id,
+    task_id,
+    report_type,
+    period_start,
+    period_end,
+    status,
+    file_reference,
+    file_size_bytes,
+    download_count,
+    generated_at,
+    error_message,
+    summary_json,
+    created_at,
+    updated_at
+) VALUES
+    (1, 1, 2, 'SUSTAINABILITY', '2026-07-01', '2026-09-30', 'COMPLETED',
+        '/storage/reports/2026_q3_sustainability_user1.pdf',
+        1845200, 5, '2026-10-02 11:30:00+00', NULL,
+        '{"total_co2e": 12806.0, "scope1": 449.6, "scope2": 12218.0, "scope3": 138.4, "top_category": "Electricity", "net_zero_progress_pct": 14.5}'::jsonb,
+        '2026-10-02 11:28:00+00', '2026-10-02 11:30:00+00'),
+
+    (2, 1, 3, 'MONTHLY',        '2026-11-01', '2026-11-30', 'COMPLETED',
+        '/storage/reports/2026_11_monthly_user1.pdf',
+        1254300, 2, '2026-12-02 09:15:00+00', NULL,
+        '{"total_co2e": 3814.2, "scope1": 158.2, "scope2": 3608.0, "scope3": 48.0, "top_category": "Electricity", "net_zero_progress_pct": 16.8}'::jsonb,
+        '2026-12-02 09:12:00+00', '2026-12-02 09:15:00+00'),
+
+    (3, 2, 4, 'QUARTERLY',      '2026-07-01', '2026-09-30', 'COMPLETED',
+        '/storage/reports/2026_q3_manufacturing_user2.pdf',
+        2450800, 8, '2026-10-05 14:20:00+00', NULL,
+        '{"total_co2e": 38538.0, "scope1": 7034.0, "scope2": 31566.0, "scope3": -62.0, "top_category": "Electricity", "net_zero_progress_pct": 8.2}'::jsonb,
+        '2026-10-05 14:18:00+00', '2026-10-05 14:20:00+00'),
+
+    (4, 3, 6, 'MONTHLY',        '2026-12-01', '2026-12-31', 'RUNNING',
+        NULL, NULL, 0, NULL, NULL, NULL,
+        '2026-12-30 18:00:00+00', '2026-12-30 18:00:02+00'),
+
+    (5, 1, 7, 'ANNUAL',         '2026-01-01', '2026-12-31', 'QUEUED',
+        NULL, NULL, 0, NULL, NULL, NULL,
+        '2026-12-30 20:15:00+00', '2026-12-30 20:15:00+00')
+ON CONFLICT (id) DO NOTHING;
+
+
+-- Reset sequences so subsequent insertions do not conflict
+SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));
+SELECT setval('emission_records_id_seq', (SELECT COALESCE(MAX(id), 1) FROM emission_records));
+SELECT setval('tasks_id_seq', (SELECT COALESCE(MAX(id), 1) FROM tasks));
+SELECT setval('forecasts_id_seq', (SELECT COALESCE(MAX(id), 1) FROM forecasts));
+SELECT setval('reports_id_seq', (SELECT COALESCE(MAX(id), 1) FROM reports));
+SELECT setval('ai_conversations_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_conversations));
+SELECT setval('ai_messages_id_seq', (SELECT COALESCE(MAX(id), 1) FROM ai_messages));
+
+
 COMMIT;
 
 
 -- ============================================================================
--- SEED DATA STATISTICS (Updated 20 November 2026 — Milestone Complete)
+-- SEED DATA STATISTICS (Updated 30 December 2026 — Milestone Complete)
 -- ============================================================================
 -- Users:              10
 -- Emission Categories: 6
 -- Emission Factors:   18 (Base) / 40+ (Phase 8 Migration)
--- Emission Records:  123
+-- Emission Records:  144 (continuous monthly coverage March 2026 – December 2026)
 -- AI Conversations:   9 (Phase 9 — covering 24 Oct – 20 Nov 2026)
 -- AI Messages:       22 (Phase 9 — covering 24 Oct – 20 Nov 2026)
--- Streaming Metadata: status, latency_ms, chunk_count, model_version
+-- Tasks:              7 (C++ Scheduler — FORECAST, REPORT_GENERATION: COMPLETED, RUNNING, QUEUED)
+-- Forecasts:          9 (Phase 10 — historical validation overlap & 90-day Q1 2027 predictive series)
+-- Reports:            5 (Phase 11 — Sustainability, Monthly, Quarterly, Annual with PDF links & JSON)
 --
--- Date range: March 2026 — 20 November 2026
+-- Date range: March 2026 — 30 December 2026 (Actuals) / Jan–Mar 2027 (Forecasts)
 -- Locations:  10 Indian cities
 -- Industries: IT, Manufacturing, Energy, Finance, Transportation,
 --             Healthcare, Retail, Education, Agriculture, Construction
